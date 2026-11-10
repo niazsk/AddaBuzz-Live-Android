@@ -1,0 +1,6 @@
+{
+  "name": "AddaBuzz Live",
+  "description": "Connect • Stream • Chat • Enjoy with AddaBuzz Live live-streaming and multi-guest audio/video rooms.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
