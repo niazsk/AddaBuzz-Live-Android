@@ -20,6 +20,7 @@ class AddaBuzzRepository(
     val sessionManager: SessionManager,
     val liveKitManager: LiveKitManager
 ) {
+    val supabaseClient = SupabaseClient(sessionManager)
     private val scope = CoroutineScope(Dispatchers.Default)
 
     // Current Active Live Room

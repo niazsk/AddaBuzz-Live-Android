@@ -26,9 +26,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AddaBuzzRepository
+import com.example.data.SupabaseClient
 import com.example.model.Gift
 import com.example.model.RechargePackage
 import com.example.ui.theme.*
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -438,6 +440,13 @@ fun SettingsScreen(
     var privateMode by remember { mutableStateOf(false) }
     var showUrlSavedToast by remember { mutableStateOf(false) }
 
+    val coroutineScope = rememberCoroutineScope()
+    var supabaseUrl by remember { mutableStateOf(sessionManager.getSupabaseUrl()) }
+    var supabaseAnonKey by remember { mutableStateOf(sessionManager.getSupabaseAnonKey()) }
+    var isTestingSupabase by remember { mutableStateOf(false) }
+    var supabaseTestResult by remember { mutableStateOf<SupabaseClient.ConnectionTestResult?>(null) }
+    var showSupabaseSavedToast by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = BackgroundDark,
         topBar = {
@@ -459,9 +468,211 @@ fun SettingsScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
+            // Supabase Cloud Integration Card
+            Card(
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                border = CardDefaults.outlinedCardBorder().copy(
+                    width = 1.5.dp,
+                    brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan, PurplePrimary))
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(modifier = Modifier.padding(18.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(EmeraldGreen.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text("⚡", fontSize = 20.sp)
+                        }
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column {
+                            Text(
+                                text = "Supabase Cloud (supabase.com)",
+                                style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+                            )
+                            Text(
+                                text = "Authentication & Realtime Database",
+                                style = Typography.labelSmall.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    Text(
+                        text = "Connect directly to your existing Supabase project for persistent user auth and realtime syncing across Web and Android.",
+                        style = Typography.bodyMedium.copy(color = TextSecondary, fontSize = 13.sp)
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    OutlinedTextField(
+                        value = supabaseUrl,
+                        onValueChange = { supabaseUrl = it },
+                        label = { Text("Supabase Project URL") },
+                        placeholder = { Text("https://your-project.supabase.co") },
+                        leadingIcon = { Icon(Icons.Default.Link, contentDescription = null, tint = EmeraldGreen) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = EmeraldGreen,
+                            unfocusedBorderColor = SurfaceCardBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedContainerColor = SurfaceDark,
+                            unfocusedContainerColor = SurfaceDark
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = supabaseAnonKey,
+                        onValueChange = { supabaseAnonKey = it },
+                        label = { Text("Supabase Anon / Public Key") },
+                        placeholder = { Text("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...") },
+                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = ElectricCyan) },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ElectricCyan,
+                            unfocusedBorderColor = SurfaceCardBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary,
+                            focusedContainerColor = SurfaceDark,
+                            unfocusedContainerColor = SurfaceDark
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    // Buttons: Test Connection & Save
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                if (supabaseUrl.isBlank() || !supabaseUrl.startsWith("http")) {
+                                    supabaseTestResult = SupabaseClient.ConnectionTestResult.Failed(
+                                        "Please enter your Supabase Project URL first (e.g. https://your-project.supabase.co from supabase.com -> Project Settings -> API)"
+                                    )
+                                } else {
+                                    isTestingSupabase = true
+                                    supabaseTestResult = null
+                                    coroutineScope.launch {
+                                        val result = repository.supabaseClient.testConnection(supabaseUrl, supabaseAnonKey)
+                                        supabaseTestResult = result
+                                        isTestingSupabase = false
+                                    }
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            border = ButtonDefaults.outlinedButtonBorder.copy(
+                                brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan))
+                            ),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            if (isTestingSupabase) {
+                                CircularProgressIndicator(color = EmeraldGreen, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            } else {
+                                Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(18.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Test Link", style = Typography.labelMedium.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold))
+                            }
+                        }
+
+                        Button(
+                            onClick = {
+                                sessionManager.setSupabaseUrl(supabaseUrl)
+                                sessionManager.setSupabaseAnonKey(supabaseAnonKey)
+                                showSupabaseSavedToast = true
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Save, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Save Keys", style = Typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                        }
+                    }
+
+                    // Test Result Feedback
+                    supabaseTestResult?.let { result ->
+                        Spacer(modifier = Modifier.height(10.dp))
+                        when (result) {
+                            is SupabaseClient.ConnectionTestResult.Connected -> {
+                                Surface(
+                                    color = EmeraldGreen.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan))),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldGreen)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(
+                                                text = "Connected to Supabase! 🚀",
+                                                style = Typography.labelMedium.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                                            )
+                                            Text(
+                                                text = "Latency: ${result.latencyMs}ms • Endpoint validated",
+                                                style = Typography.labelSmall.copy(color = TextSecondary)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                            is SupabaseClient.ConnectionTestResult.Failed -> {
+                                Surface(
+                                    color = LiveRed.copy(alpha = 0.15f),
+                                    shape = RoundedCornerShape(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = LiveRed)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = result.error,
+                                            style = Typography.labelSmall.copy(color = LiveRed)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (showSupabaseSavedToast) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Supabase configuration saved!",
+                            color = EmeraldGreen,
+                            style = Typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             // Backend Integration Section
             Text(
-                text = "Backend Server Integration",
+                text = "LiveKit & Web Server Integration",
                 style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ElectricCyan)
             )
             Spacer(modifier = Modifier.height(8.dp))

@@ -26,9 +26,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AddaBuzzRepository
+import com.example.data.SupabaseClient
 import com.example.model.User
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @Composable
 fun SplashScreen(
@@ -94,7 +96,21 @@ fun SplashScreen(
                 )
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = SurfaceGlassHigh,
+                border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(PurplePrimary, ElectricCyan)))
+            ) {
+                Text(
+                    text = "⚡ Supabase Powered Auth & Realtime",
+                    style = Typography.labelSmall.copy(color = ElectricCyan, fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
 
             CircularProgressIndicator(
                 color = PurplePrimary,
@@ -111,11 +127,17 @@ fun LoginScreen(
     onLoginSuccess: () -> Unit,
     onNavigateRegister: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var email by remember { mutableStateOf("fayselsk@gmail.com") }
     var password by remember { mutableStateOf("password123") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    var showForgotPasswordDialog by remember { mutableStateOf(false) }
+    var forgotEmail by remember { mutableStateOf("fayselsk@gmail.com") }
+
+    val supabaseUrl = remember { repository.sessionManager.getSupabaseUrl() }
 
     Box(
         modifier = Modifier
@@ -155,11 +177,32 @@ fun LoginScreen(
                 style = Typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
             )
             Text(
-                text = "Sign in to join live streams and 8-seat audio rooms",
+                text = "Sign in with Supabase to join live streams & 8-seat rooms",
                 style = Typography.bodyMedium.copy(color = TextSecondary, textAlign = TextAlign.Center)
             )
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Supabase Badge
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = Color(0x3310B981),
+                border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan)))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(EmeraldGreen))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Supabase Auth Active",
+                        style = Typography.labelSmall.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
 
             // Email Field
             OutlinedTextField(
@@ -211,14 +254,33 @@ fun LoginScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
-            if (errorMessage != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(text = errorMessage!!, color = LiveRed, style = Typography.bodyMedium)
+            // Forgot Password link
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Text(
+                    text = "Forgot password?",
+                    style = Typography.labelSmall.copy(color = ElectricCyan, fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.clickable { showForgotPasswordDialog = true }
+                )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            if (errorMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = errorMessage!!, color = LiveRed, style = Typography.bodyMedium, textAlign = TextAlign.Center)
+            }
 
-            // Login Button
+            if (resetSuccessMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(text = resetSuccessMessage!!, color = EmeraldGreen, style = Typography.bodyMedium, textAlign = TextAlign.Center)
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // Supabase Sign In Button
             Button(
                 onClick = {
                     if (email.isBlank() || password.isBlank()) {
@@ -226,23 +288,20 @@ fun LoginScreen(
                         return@Button
                     }
                     isLoading = true
-                    val user = User(
-                        id = "usr_${System.currentTimeMillis()}",
-                        username = email.substringBefore("@"),
-                        displayName = "Faysel SK",
-                        email = email,
-                        avatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
-                        bio = "Streamer & Adda lover 🎙️",
-                        followersCount = 2150,
-                        followingCount = 412,
-                        diamonds = 3500,
-                        beans = 8900,
-                        level = 28,
-                        isVip = true
-                    )
-                    repository.sessionManager.saveUserSession(user, "token_demo_fayselsk")
-                    isLoading = false
-                    onLoginSuccess()
+                    errorMessage = null
+                    coroutineScope.launch {
+                        when (val result = repository.supabaseClient.signIn(email, password)) {
+                            is SupabaseClient.AuthResult.Success -> {
+                                repository.sessionManager.saveUserSession(result.user, result.accessToken)
+                                isLoading = false
+                                onLoginSuccess()
+                            }
+                            is SupabaseClient.AuthResult.Error -> {
+                                isLoading = false
+                                errorMessage = result.message
+                            }
+                        }
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
                 shape = RoundedCornerShape(14.dp),
@@ -254,7 +313,7 @@ fun LoginScreen(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
                     Text(
-                        text = "Sign In",
+                        text = "Sign In with Supabase",
                         style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
                     )
                 }
@@ -311,6 +370,58 @@ fun LoginScreen(
             }
         }
     }
+
+    // Forgot Password Dialog
+    if (showForgotPasswordDialog) {
+        AlertDialog(
+            onDismissRequest = { showForgotPasswordDialog = false },
+            containerColor = SurfaceDark,
+            title = {
+                Text("Reset Password", style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Enter your account email to receive a password recovery link from Supabase.",
+                        style = Typography.bodyMedium.copy(color = TextSecondary)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = forgotEmail,
+                        onValueChange = { forgotEmail = it },
+                        label = { Text("Account Email") },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = ElectricCyan,
+                            unfocusedBorderColor = SurfaceCardBorder,
+                            focusedTextColor = TextPrimary,
+                            unfocusedTextColor = TextPrimary
+                        ),
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        coroutineScope.launch {
+                            repository.supabaseClient.sendPasswordReset(forgotEmail)
+                            resetSuccessMessage = "Password reset email sent via Supabase for $forgotEmail"
+                            showForgotPasswordDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
+                ) {
+                    Text("Send Link", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showForgotPasswordDialog = false }) {
+                    Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
 }
 
 @Composable
@@ -319,11 +430,13 @@ fun RegisterScreen(
     onRegisterSuccess: () -> Unit,
     onNavigateLogin: () -> Unit
 ) {
+    val coroutineScope = rememberCoroutineScope()
     var name by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -345,7 +458,7 @@ fun RegisterScreen(
                 style = Typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
             )
             Text(
-                text = "Create your creator or viewer account",
+                text = "Register with Supabase to stream and chat",
                 style = Typography.bodyMedium.copy(color = TextSecondary)
             )
 
@@ -411,7 +524,7 @@ fun RegisterScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text("Password (Min 6 characters)") },
                 leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null, tint = PurplePrimary) },
                 visualTransformation = PasswordVisualTransformation(),
                 colors = OutlinedTextFieldDefaults.colors(
@@ -428,7 +541,7 @@ fun RegisterScreen(
 
             if (errorMessage != null) {
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(text = errorMessage!!, color = LiveRed, style = Typography.bodyMedium)
+                Text(text = errorMessage!!, color = LiveRed, style = Typography.bodyMedium, textAlign = TextAlign.Center)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -439,18 +552,21 @@ fun RegisterScreen(
                         errorMessage = "Please fill in all fields"
                         return@Button
                     }
-                    val user = User(
-                        id = "usr_${System.currentTimeMillis()}",
-                        username = username.ifBlank { email.substringBefore("@") },
-                        displayName = name,
-                        email = email,
-                        avatarUrl = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200",
-                        bio = "New AddaBuzz Creator 🌟",
-                        diamonds = 1000,
-                        beans = 2000
-                    )
-                    repository.sessionManager.saveUserSession(user, "token_reg_${System.currentTimeMillis()}")
-                    onRegisterSuccess()
+                    isLoading = true
+                    errorMessage = null
+                    coroutineScope.launch {
+                        when (val result = repository.supabaseClient.signUp(email, password, name)) {
+                            is SupabaseClient.AuthResult.Success -> {
+                                repository.sessionManager.saveUserSession(result.user, result.accessToken)
+                                isLoading = false
+                                onRegisterSuccess()
+                            }
+                            is SupabaseClient.AuthResult.Error -> {
+                                isLoading = false
+                                errorMessage = result.message
+                            }
+                        }
+                    }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
                 shape = RoundedCornerShape(14.dp),
@@ -458,7 +574,11 @@ fun RegisterScreen(
                     .fillMaxWidth()
                     .height(52.dp)
             ) {
-                Text(text = "Create Account", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                if (isLoading) {
+                    CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                } else {
+                    Text(text = "Create Supabase Account", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                }
             }
 
             Spacer(modifier = Modifier.height(20.dp))

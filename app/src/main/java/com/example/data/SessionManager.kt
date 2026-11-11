@@ -18,12 +18,31 @@ class SessionManager(context: Context) {
         const val KEY_USER_EMAIL = "user_email"
         const val KEY_USER_AVATAR = "user_avatar"
         const val KEY_SERVER_URL = "server_url"
+        const val KEY_SUPABASE_URL = "supabase_url"
+        const val KEY_SUPABASE_ANON_KEY = "supabase_anon_key"
         const val KEY_RESOLUTION = "stream_resolution"
         const val KEY_MIC_MUTED = "stream_mic_muted"
         const val KEY_CAM_ENABLED = "stream_cam_enabled"
 
         const val DEFAULT_SERVER_URL =
             "https://ais-dev-5rvojij5ycow7bw5erv6dc-218062420511.asia-southeast1.run.app"
+        const val DEFAULT_SUPABASE_URL = "https://citiaagytdkomcmkuhkk.supabase.co"
+        const val DEFAULT_SUPABASE_ANON_KEY = "sb_publishable_84NpiaDV0dfaFOWFbTFdwA_AKFby-Lo"
+
+        fun sanitizeSupabaseUrl(raw: String): String {
+            var url = raw.trim()
+            if (url.isBlank()) return ""
+            if (!url.startsWith("http://") && !url.startsWith("https://")) {
+                url = "https://$url"
+            }
+            url = url.trimEnd('/')
+            if (url.endsWith("/rest/v1")) {
+                url = url.removeSuffix("/rest/v1")
+            } else if (url.endsWith("/auth/v1")) {
+                url = url.removeSuffix("/auth/v1")
+            }
+            return url.trimEnd('/')
+        }
     }
 
     private val _currentUser = MutableStateFlow<User?>(null)
@@ -33,6 +52,12 @@ class SessionManager(context: Context) {
     val serverUrl: StateFlow<String> = _serverUrl.asStateFlow()
 
     init {
+        // Clear old dummy placeholder URL if previously stored
+        val cachedUrl = prefs.getString(KEY_SUPABASE_URL, "")
+        if (cachedUrl?.contains("kvyuzqvyiabxdfgjhklp") == true || cachedUrl.isNullOrBlank()) {
+            prefs.edit().putString(KEY_SUPABASE_URL, DEFAULT_SUPABASE_URL).apply()
+        }
+
         val userId = prefs.getString(KEY_USER_ID, null)
         if (userId != null) {
             _currentUser.value = User(
@@ -118,6 +143,25 @@ class SessionManager(context: Context) {
 
     fun setStreamResolution(res: String) {
         prefs.edit().putString(KEY_RESOLUTION, res).apply()
+    }
+
+    fun getSupabaseUrl(): String {
+        val url = prefs.getString(KEY_SUPABASE_URL, DEFAULT_SUPABASE_URL)
+        return if (url.isNullOrBlank() || url.contains("kvyuzqvyiabxdfgjhklp")) DEFAULT_SUPABASE_URL else sanitizeSupabaseUrl(url)
+    }
+
+    fun setSupabaseUrl(url: String) {
+        val clean = sanitizeSupabaseUrl(url)
+        prefs.edit().putString(KEY_SUPABASE_URL, clean).apply()
+    }
+
+    fun getSupabaseAnonKey(): String {
+        val key = prefs.getString(KEY_SUPABASE_ANON_KEY, DEFAULT_SUPABASE_ANON_KEY)
+        return if (key.isNullOrBlank()) DEFAULT_SUPABASE_ANON_KEY else key
+    }
+
+    fun setSupabaseAnonKey(key: String) {
+        prefs.edit().putString(KEY_SUPABASE_ANON_KEY, key).apply()
     }
 
     fun getAuthToken(): String? {
