@@ -11,9 +11,9 @@ This Android application must connect to the existing AddaBuzz Live shared backe
 - Material 3
 - Android Studio
 - LiveKit Android SDK
-- Supabase-compatible authentication
+- Firebase-compatible authentication
 - HTTPS REST API
-- WebSocket / Supabase Realtime integration
+- WebSocket / Firebase Realtime Database integration
 
 ## BRANDING
 
@@ -57,7 +57,7 @@ Create a premium dark UI:
 
 ## AUTHENTICATION
 
-Connect to the existing AddaBuzz Live Supabase authentication system through a secure, supported Android integration.
+Connect to the existing AddaBuzz Live Firebase authentication system through a secure, supported Android integration.
 
 Support:
 - Registration.

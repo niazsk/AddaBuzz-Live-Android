@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AddaBuzzRepository
-import com.example.data.SupabaseClient
+import com.example.data.FirebaseClient
 import com.example.model.User
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
@@ -104,7 +104,7 @@ fun SplashScreen(
                 border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(PurplePrimary, ElectricCyan)))
             ) {
                 Text(
-                    text = "⚡ Supabase Powered Auth & Realtime",
+                    text = "⚡ Firebase Powered Auth & Realtime",
                     style = Typography.labelSmall.copy(color = ElectricCyan, fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
@@ -136,8 +136,6 @@ fun LoginScreen(
     var isLoading by remember { mutableStateOf(false) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
     var forgotEmail by remember { mutableStateOf("fayselsk@gmail.com") }
-
-    val supabaseUrl = remember { repository.sessionManager.getSupabaseUrl() }
 
     Box(
         modifier = Modifier
@@ -177,27 +175,27 @@ fun LoginScreen(
                 style = Typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
             )
             Text(
-                text = "Sign in with Supabase to join live streams & 8-seat rooms",
+                text = "Sign in with Firebase to join live streams & 8-seat rooms",
                 style = Typography.bodyMedium.copy(color = TextSecondary, textAlign = TextAlign.Center)
             )
 
             Spacer(modifier = Modifier.height(10.dp))
 
-            // Supabase Badge
+            // Firebase Badge
             Surface(
                 shape = RoundedCornerShape(12.dp),
-                color = Color(0x3310B981),
-                border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan)))
+                color = GoldCoin.copy(alpha = 0.15f),
+                border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan)))
             ) {
                 Row(
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(EmeraldGreen))
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GoldCoin))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Supabase Auth Active",
-                        style = Typography.labelSmall.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                        text = "Firebase Auth Active",
+                        style = Typography.labelSmall.copy(color = GoldCoin, fontWeight = FontWeight.Bold)
                     )
                 }
             }
@@ -280,7 +278,7 @@ fun LoginScreen(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            // Supabase Sign In Button
+            // Firebase Sign In Button
             Button(
                 onClick = {
                     if (email.isBlank() || password.isBlank()) {
@@ -290,13 +288,13 @@ fun LoginScreen(
                     isLoading = true
                     errorMessage = null
                     coroutineScope.launch {
-                        when (val result = repository.supabaseClient.signIn(email, password)) {
-                            is SupabaseClient.AuthResult.Success -> {
+                        when (val result = repository.firebaseClient.signIn(email, password)) {
+                            is FirebaseClient.AuthResult.Success -> {
                                 repository.sessionManager.saveUserSession(result.user, result.accessToken)
                                 isLoading = false
                                 onLoginSuccess()
                             }
-                            is SupabaseClient.AuthResult.Error -> {
+                            is FirebaseClient.AuthResult.Error -> {
                                 isLoading = false
                                 errorMessage = result.message
                             }
@@ -313,7 +311,7 @@ fun LoginScreen(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
                     Text(
-                        text = "Sign In with Supabase",
+                        text = "Sign In with Firebase",
                         style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
                     )
                 }
@@ -382,7 +380,7 @@ fun LoginScreen(
             text = {
                 Column {
                     Text(
-                        text = "Enter your account email to receive a password recovery link from Supabase.",
+                        text = "Enter your account email to receive a password recovery link from Firebase.",
                         style = Typography.bodyMedium.copy(color = TextSecondary)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -405,8 +403,8 @@ fun LoginScreen(
                 Button(
                     onClick = {
                         coroutineScope.launch {
-                            repository.supabaseClient.sendPasswordReset(forgotEmail)
-                            resetSuccessMessage = "Password reset email sent via Supabase for $forgotEmail"
+                            repository.firebaseClient.sendPasswordReset(forgotEmail)
+                            resetSuccessMessage = "Password reset email sent via Firebase for $forgotEmail"
                             showForgotPasswordDialog = false
                         }
                     },
@@ -458,7 +456,7 @@ fun RegisterScreen(
                 style = Typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
             )
             Text(
-                text = "Register with Supabase to stream and chat",
+                text = "Register with Firebase to stream and chat",
                 style = Typography.bodyMedium.copy(color = TextSecondary)
             )
 
@@ -555,13 +553,13 @@ fun RegisterScreen(
                     isLoading = true
                     errorMessage = null
                     coroutineScope.launch {
-                        when (val result = repository.supabaseClient.signUp(email, password, name)) {
-                            is SupabaseClient.AuthResult.Success -> {
+                        when (val result = repository.firebaseClient.signUp(email, password, name)) {
+                            is FirebaseClient.AuthResult.Success -> {
                                 repository.sessionManager.saveUserSession(result.user, result.accessToken)
                                 isLoading = false
                                 onRegisterSuccess()
                             }
-                            is SupabaseClient.AuthResult.Error -> {
+                            is FirebaseClient.AuthResult.Error -> {
                                 isLoading = false
                                 errorMessage = result.message
                             }
@@ -577,7 +575,7 @@ fun RegisterScreen(
                 if (isLoading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text(text = "Create Supabase Account", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                    Text(text = "Create Firebase Account", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
                 }
             }
 

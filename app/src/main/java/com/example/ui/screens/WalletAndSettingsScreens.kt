@@ -26,7 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AddaBuzzRepository
-import com.example.data.SupabaseClient
+import com.example.data.FirebaseClient
 import com.example.model.Gift
 import com.example.model.RechargePackage
 import com.example.ui.theme.*
@@ -441,11 +441,11 @@ fun SettingsScreen(
     var showUrlSavedToast by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
-    var supabaseUrl by remember { mutableStateOf(sessionManager.getSupabaseUrl()) }
-    var supabaseAnonKey by remember { mutableStateOf(sessionManager.getSupabaseAnonKey()) }
-    var isTestingSupabase by remember { mutableStateOf(false) }
-    var supabaseTestResult by remember { mutableStateOf<SupabaseClient.ConnectionTestResult?>(null) }
-    var showSupabaseSavedToast by remember { mutableStateOf(false) }
+    var firebaseApiKey by remember { mutableStateOf(sessionManager.getFirebaseApiKey()) }
+    var firebaseProjectId by remember { mutableStateOf(sessionManager.getFirebaseProjectId()) }
+    var isTestingFirebase by remember { mutableStateOf(false) }
+    var firebaseTestResult by remember { mutableStateOf<FirebaseClient.ConnectionTestResult?>(null) }
+    var showFirebaseSavedToast by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -468,13 +468,13 @@ fun SettingsScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Supabase Cloud Integration Card
+            // Firebase Cloud Integration Card
             Card(
                 shape = RoundedCornerShape(20.dp),
                 colors = CardDefaults.cardColors(containerColor = SurfaceCard),
                 border = CardDefaults.outlinedCardBorder().copy(
                     width = 1.5.dp,
-                    brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan, PurplePrimary))
+                    brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan, PurplePrimary))
                 ),
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -484,20 +484,20 @@ fun SettingsScreen(
                             modifier = Modifier
                                 .size(36.dp)
                                 .clip(CircleShape)
-                                .background(EmeraldGreen.copy(alpha = 0.2f)),
+                                .background(GoldCoin.copy(alpha = 0.2f)),
                             contentAlignment = Alignment.Center
                         ) {
-                            Text("⚡", fontSize = 20.sp)
+                            Text("🔥", fontSize = 20.sp)
                         }
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = "Supabase Cloud (supabase.com)",
+                                text = "Firebase Cloud (firebase.google.com)",
                                 style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
                             )
                             Text(
-                                text = "Authentication & Realtime Database",
-                                style = Typography.labelSmall.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                                text = "Firebase Auth & Realtime Database",
+                                style = Typography.labelSmall.copy(color = GoldCoin, fontWeight = FontWeight.Bold)
                             )
                         }
                     }
@@ -505,21 +505,21 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
-                        text = "Connect directly to your existing Supabase project for persistent user auth and realtime syncing across Web and Android.",
+                        text = "Connect directly to your Firebase project for persistent user auth and realtime syncing across Web and Android.",
                         style = Typography.bodyMedium.copy(color = TextSecondary, fontSize = 13.sp)
                     )
 
                     Spacer(modifier = Modifier.height(14.dp))
 
                     OutlinedTextField(
-                        value = supabaseUrl,
-                        onValueChange = { supabaseUrl = it },
-                        label = { Text("Supabase Project URL") },
-                        placeholder = { Text("https://your-project.supabase.co") },
-                        leadingIcon = { Icon(Icons.Default.Link, contentDescription = null, tint = EmeraldGreen) },
+                        value = firebaseApiKey,
+                        onValueChange = { firebaseApiKey = it },
+                        label = { Text("Firebase API Key") },
+                        placeholder = { Text("AIza...") },
+                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = ElectricCyan) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = EmeraldGreen,
+                            focusedBorderColor = ElectricCyan,
                             unfocusedBorderColor = SurfaceCardBorder,
                             focusedTextColor = TextPrimary,
                             unfocusedTextColor = TextPrimary,
@@ -533,11 +533,11 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     OutlinedTextField(
-                        value = supabaseAnonKey,
-                        onValueChange = { supabaseAnonKey = it },
-                        label = { Text("Supabase Anon / Public Key") },
-                        placeholder = { Text("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...") },
-                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = ElectricCyan) },
+                        value = firebaseProjectId,
+                        onValueChange = { firebaseProjectId = it },
+                        label = { Text("Firebase Project ID") },
+                        placeholder = { Text("adda-buzz-live") },
+                        leadingIcon = { Icon(Icons.Default.Link, contentDescription = null, tint = ElectricCyan) },
                         singleLine = true,
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ElectricCyan,
@@ -560,82 +560,82 @@ fun SettingsScreen(
                     ) {
                         OutlinedButton(
                             onClick = {
-                                if (supabaseUrl.isBlank() || !supabaseUrl.startsWith("http")) {
-                                    supabaseTestResult = SupabaseClient.ConnectionTestResult.Failed(
-                                        "Please enter your Supabase Project URL first (e.g. https://your-project.supabase.co from supabase.com -> Project Settings -> API)"
+                                if (firebaseApiKey.isBlank()) {
+                                    firebaseTestResult = FirebaseClient.ConnectionTestResult.Failed(
+                                        "Please enter your Firebase API Key first (from Firebase Console -> Project Settings -> General -> Your apps -> Android app)"
                                     )
                                 } else {
-                                    isTestingSupabase = true
-                                    supabaseTestResult = null
+                                    isTestingFirebase = true
+                                    firebaseTestResult = null
                                     coroutineScope.launch {
-                                        val result = repository.supabaseClient.testConnection(supabaseUrl, supabaseAnonKey)
-                                        supabaseTestResult = result
-                                        isTestingSupabase = false
+                                        val result = repository.firebaseClient.testConnection(firebaseApiKey, firebaseProjectId)
+                                        firebaseTestResult = result
+                                        isTestingFirebase = false
                                     }
                                 }
                             },
                             shape = RoundedCornerShape(12.dp),
                             border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan))
+                                brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan))
                             ),
                             modifier = Modifier.weight(1f)
                         ) {
-                            if (isTestingSupabase) {
-                                CircularProgressIndicator(color = EmeraldGreen, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                            if (isTestingFirebase) {
+                                CircularProgressIndicator(color = GoldCoin, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
                             } else {
-                                Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = EmeraldGreen, modifier = Modifier.size(18.dp))
+                                Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = GoldCoin, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("Test Link", style = Typography.labelMedium.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold))
+                                Text("Test Connection", style = Typography.labelMedium.copy(color = GoldCoin, fontWeight = FontWeight.Bold))
                             }
                         }
 
                         Button(
                             onClick = {
-                                sessionManager.setSupabaseUrl(supabaseUrl)
-                                sessionManager.setSupabaseAnonKey(supabaseAnonKey)
-                                showSupabaseSavedToast = true
+                                sessionManager.setFirebaseApiKey(firebaseApiKey)
+                                sessionManager.setFirebaseProjectId(firebaseProjectId)
+                                showFirebaseSavedToast = true
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = EmeraldGreen),
+                            colors = ButtonDefaults.buttonColors(containerColor = GoldCoin),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save Keys", style = Typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                            Text("Save Config", style = Typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
                         }
                     }
 
                     // Test Result Feedback
-                    supabaseTestResult?.let { result ->
+                    firebaseTestResult?.let { result ->
                         Spacer(modifier = Modifier.height(10.dp))
                         when (result) {
-                            is SupabaseClient.ConnectionTestResult.Connected -> {
+                            is FirebaseClient.ConnectionTestResult.Connected -> {
                                 Surface(
-                                    color = EmeraldGreen.copy(alpha = 0.15f),
+                                    color = ElectricCyan.copy(alpha = 0.15f),
                                     shape = RoundedCornerShape(10.dp),
-                                    border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(EmeraldGreen, ElectricCyan))),
+                                    border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan))),
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
                                     Row(
                                         modifier = Modifier.padding(10.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = EmeraldGreen)
+                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = ElectricCyan)
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Column {
                                             Text(
-                                                text = "Connected to Supabase! 🚀",
-                                                style = Typography.labelMedium.copy(color = EmeraldGreen, fontWeight = FontWeight.Bold)
+                                                text = "Connected to Firebase! 🚀",
+                                                style = Typography.labelMedium.copy(color = ElectricCyan, fontWeight = FontWeight.Bold)
                                             )
                                             Text(
-                                                text = "Latency: ${result.latencyMs}ms • Endpoint validated",
+                                                text = "Latency: ${result.latencyMs}ms • Firebase Auth reachable",
                                                 style = Typography.labelSmall.copy(color = TextSecondary)
                                             )
                                         }
                                     }
                                 }
                             }
-                            is SupabaseClient.ConnectionTestResult.Failed -> {
+                            is FirebaseClient.ConnectionTestResult.Failed -> {
                                 Surface(
                                     color = LiveRed.copy(alpha = 0.15f),
                                     shape = RoundedCornerShape(10.dp),
@@ -657,11 +657,11 @@ fun SettingsScreen(
                         }
                     }
 
-                    if (showSupabaseSavedToast) {
+                    if (showFirebaseSavedToast) {
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Supabase configuration saved!",
-                            color = EmeraldGreen,
+                            text = "Firebase configuration saved!",
+                            color = GoldCoin,
                             style = Typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                         )
                     }

@@ -2,6 +2,10 @@ package com.example.data
 
 import android.content.Context
 import com.example.model.*
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.ListenerRegistration
+import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -20,8 +24,10 @@ class AddaBuzzRepository(
     val sessionManager: SessionManager,
     val liveKitManager: LiveKitManager
 ) {
-    val supabaseClient = SupabaseClient(sessionManager)
+    val firebaseClient = FirebaseClient(sessionManager)
+    private val firestore = FirebaseFirestore.getInstance()
     private val scope = CoroutineScope(Dispatchers.Default)
+    private var liveMessagesListener: ListenerRegistration? = null
 
     // Current Active Live Room
     private val _currentRoom = MutableStateFlow<LiveRoom?>(null)
@@ -343,6 +349,45 @@ class AddaBuzzRepository(
         )
     }
 
+    // Firebase Firestore realtime listeners for live room chat
+    fun startLiveRoomMessagesListener(roomId: String) {
+        stopLiveRoomMessagesListener()
+        liveMessagesListener = firestore
+            .collection("live_rooms")
+            .document(roomId)
+            .collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .addSnapshotListener { snapshots, error ->
+                if (error != null) return@addSnapshotListener
+                val messages = snapshots?.mapNotNull { doc ->
+                    val data = doc.data ?: return@mapNotNull null
+                    val senderId = data["sender_id"] as? String ?: return@mapNotNull null
+                    ChatMessage(
+                        id = doc.id,
+                        sender = User(
+                            id = senderId,
+                            username = (data["sender_username"] as? String) ?: "user",
+                            displayName = (data["sender_name"] as? String) ?: "User",
+                            email = (data["sender_email"] as? String) ?: "",
+                            avatarUrl = (data["sender_avatar"] as? String) ?: ""
+                        ),
+                        text = (data["text"] as? String) ?: "",
+                        timestamp = (data["timestamp"] as? Long) ?: System.currentTimeMillis(),
+                        isGift = (data["is_gift"] as? Boolean) ?: false,
+                        giftName = data["gift_name"] as? String,
+                        giftIcon = data["gift_icon"] as? String,
+                        giftAmount = (data["gift_amount"] as? Long)?.toInt()
+                    )
+                } ?: emptyList()
+                _liveMessages.value = messages
+            }
+    }
+
+    fun stopLiveRoomMessagesListener() {
+        liveMessagesListener?.remove()
+        liveMessagesListener = null
+    }
+
     // Gift Catalog
     val availableGifts = listOf(
         Gift(
@@ -445,6 +490,9 @@ class AddaBuzzRepository(
             asPublisher = asHost
         )
 
+        // Listen to live room chat messages via Firebase Firestore (realtime)
+        startLiveRoomMessagesListener(room.id)
+
         // Seed chat messages
         _liveMessages.value = listOf(
             ChatMessage(
@@ -461,6 +509,7 @@ class AddaBuzzRepository(
     }
 
     fun leaveCurrentRoom() {
+        stopLiveRoomMessagesListener()
         liveKitManager.leaveRoom()
         _currentRoom.value = null
         _liveMessages.value = emptyList()
@@ -476,6 +525,22 @@ class AddaBuzzRepository(
             timestamp = System.currentTimeMillis()
         )
         _liveMessages.value = _liveMessages.value + msg
+
+        // Persist live room chat message to Firebase Firestore
+        val roomId = _currentRoom.value?.id ?: "room_${System.currentTimeMillis()}"
+        firestore.collection("live_rooms").document(roomId).collection("messages")
+            .add(
+                hashMapOf(
+                    "sender_id" to user.id,
+                    "sender_username" to user.username,
+                    "sender_name" to user.displayName,
+                    "sender_avatar" to user.avatarUrl,
+                    "sender_email" to user.email,
+                    "text" to text,
+                    "timestamp" to FieldValue.serverTimestamp(),
+                    "is_gift" to false
+                )
+            )
 
         // Add auto-reply from audience after slight delay for lively experience
         scope.launch {
@@ -524,6 +589,25 @@ class AddaBuzzRepository(
 
         _liveMessages.value = _liveMessages.value + giftMessage
         _giftCelebrationEvent.tryEmit(giftMessage)
+
+        // Persist gift message to Firebase Firestore
+        val roomId = _currentRoom.value?.id ?: "room_${System.currentTimeMillis()}"
+        firestore.collection("live_rooms").document(roomId).collection("messages")
+            .add(
+                hashMapOf(
+                    "sender_id" to user.id,
+                    "sender_username" to user.username,
+                    "sender_name" to user.displayName,
+                    "sender_avatar" to user.avatarUrl,
+                    "sender_email" to user.email,
+                    "text" to "Sent ${gift.name} ${gift.iconEmoji} (${gift.diamondPrice} 💎)",
+                    "timestamp" to FieldValue.serverTimestamp(),
+                    "is_gift" to true,
+                    "gift_name" to gift.name,
+                    "gift_icon" to gift.iconEmoji,
+                    "gift_amount" to gift.diamondPrice.toLong()
+                )
+            )
 
         // Log transaction
         val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
@@ -688,6 +772,17 @@ class AddaBuzzRepository(
                 conv.copy(lastMessage = text, timestamp = System.currentTimeMillis())
             } else conv
         }
+
+        // Persist direct message to Firebase Firestore
+        firestore.collection("conversations").document(conversationId).collection("messages")
+            .add(
+                hashMapOf(
+                    "sender_id" to "me",
+                    "text" to text,
+                    "timestamp" to FieldValue.serverTimestamp(),
+                    "is_from_me" to true
+                )
+            )
 
         // Friendly auto-reply simulation
         scope.launch {
