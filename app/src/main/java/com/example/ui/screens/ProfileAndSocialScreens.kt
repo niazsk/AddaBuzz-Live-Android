@@ -38,10 +38,12 @@ fun UserProfileScreen(
     onNavigateFollowing: () -> Unit,
     onNavigateWallet: () -> Unit,
     onNavigateSettings: () -> Unit,
-    onNavigateMenu: (ProfileMenuOption) -> Unit
+    onNavigateMenu: (ProfileMenuOption) -> Unit,
+    onNavigateAgentMenu: (AgentMenuOption) -> Unit
 ) {
     val currentUser by repository.sessionManager.currentUser.collectAsState()
     val user = currentUser ?: return
+    var selectedAgentOption by remember { mutableStateOf<AgentMenuOption?>(null) }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -168,6 +170,18 @@ fun UserProfileScreen(
             item {
                 Spacer(modifier = Modifier.height(16.dp))
                 ProfileOptionsGrid(onSelect = onNavigateMenu)
+            }
+
+            // Agent Management Section
+            item {
+                Spacer(modifier = Modifier.height(20.dp))
+                AgentManagementSection(
+                    selected = selectedAgentOption,
+                    onSelect = { option ->
+                        selectedAgentOption = option
+                        onNavigateAgentMenu(option)
+                    }
+                )
             }
 
             // Coins & Diamonds Options

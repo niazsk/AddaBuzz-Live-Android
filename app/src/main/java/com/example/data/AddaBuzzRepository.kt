@@ -95,6 +95,16 @@ class AddaBuzzRepository(
     private val _fanClubMemberships = MutableStateFlow<Set<String>>(emptySet())
     val fanClubMemberships: StateFlow<Set<String>> = _fanClubMemberships.asStateFlow()
 
+    // Agent network
+    private val _agents = MutableStateFlow<List<Agent>>(emptyList())
+    val agents: StateFlow<List<Agent>> = _agents.asStateFlow()
+
+    private val _pendingAgentInvites = MutableStateFlow<List<String>>(emptyList())
+    val pendingAgentInvites: StateFlow<List<String>> = _pendingAgentInvites.asStateFlow()
+
+    private val _addedHosts = MutableStateFlow<List<String>>(emptyList())
+    val addedHosts: StateFlow<List<String>> = _addedHosts.asStateFlow()
+
     init {
         seedInitialData()
     }
@@ -358,6 +368,66 @@ class AddaBuzzRepository(
                 date = dateFormat.format(Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24)),
                 isCredit = false,
                 type = "WITHDRAW"
+            )
+        )
+
+        // Seed Agent Network
+        _agents.value = listOf(
+            Agent(
+                id = "agt_1",
+                name = "Rakib Chowdhury",
+                username = "rakib_agent",
+                agentCode = "AGT-1001",
+                referralCode = "RAKIB1001",
+                referredUsers = 342,
+                earnings = 128400,
+                level = 38,
+                isSuperAgent = true,
+                status = "Active"
+            ),
+            Agent(
+                id = "agt_2",
+                name = "Nusrat Jahan",
+                username = "nusrat_ag",
+                agentCode = "AGT-1002",
+                referralCode = "NUSRAT22",
+                referredUsers = 218,
+                earnings = 84250,
+                level = 29,
+                status = "Active"
+            ),
+            Agent(
+                id = "agt_3",
+                name = "Tanvir Hasan",
+                username = "tanvir_agt",
+                agentCode = "AGT-1003",
+                referralCode = "TANVIR88",
+                referredUsers = 154,
+                earnings = 51900,
+                level = 21,
+                status = "Active"
+            ),
+            Agent(
+                id = "agt_4",
+                name = "Sadia Islam",
+                username = "sadia_ag",
+                agentCode = "AGT-1004",
+                referralCode = "SADIA55",
+                referredUsers = 96,
+                earnings = 28700,
+                level = 14,
+                status = "Active"
+            ),
+            Agent(
+                id = "agt_5",
+                name = "Arif Chowdhury",
+                username = "arif_agt",
+                agentCode = "AGT-1005",
+                referralCode = "ARIF66",
+                referredUsers = 12,
+                earnings = 4300,
+                level = 4,
+                status = "Pending"
             )
         )
     }
@@ -877,6 +947,56 @@ class AddaBuzzRepository(
             type = type
         )
         _transactions.value = listOf(tx) + _transactions.value
+    }
+
+    // Agent network operations
+    fun inviteAgent(username: String): Boolean {
+        val clean = username.trim().removePrefix("@")
+        if (clean.isEmpty()) return false
+        if (_pendingAgentInvites.value.any { it.equals(clean, ignoreCase = true) }) return false
+        _pendingAgentInvites.value = _pendingAgentInvites.value + clean
+        return true
+    }
+
+    fun addHost(username: String, displayName: String): Boolean {
+        val clean = username.trim().removePrefix("@")
+        if (clean.isEmpty()) return false
+        if (_addedHosts.value.any { it.equals(clean, ignoreCase = true) }) return false
+        _addedHosts.value = _addedHosts.value + clean
+        val newAgent = Agent(
+            id = "host_${System.currentTimeMillis()}",
+            name = displayName.trim().ifBlank { clean },
+            username = clean,
+            agentCode = "AGT-${(1000 + _agents.value.size)}",
+            referralCode = clean.uppercase().take(10),
+            referredUsers = 0,
+            earnings = 0,
+            level = 1,
+            status = "Host"
+        )
+        _agents.value = _agents.value + newAgent
+        return true
+    }
+
+    fun agentRanking(): List<Agent> = _agents.value.sortedByDescending { it.earnings }
+
+    fun diamondAgents(): List<Agent> = _agents.value.sortedByDescending { it.earnings * 8 / 100 }
+
+    // Coins Trading: 100 coins -> 8 diamonds
+    fun tradeCoinsForDiamonds(coins: Long): Long {
+        val user = sessionManager.currentUser.value ?: return 0
+        if (coins <= 0 || user.coins < coins) return 0
+        val diamonds = coins * 8 / 100
+        if (diamonds <= 0) return 0
+        sessionManager.updateCoins(user.coins - coins)
+        sessionManager.updateDiamonds(user.diamonds + diamonds)
+        recordTransaction(
+            title = "Traded $coins coins for $diamonds diamonds",
+            amount = "+$diamonds 💎",
+            isCredit = true,
+            type = "TRADE"
+        )
+        return diamonds
     }
 
     // Create a new stream

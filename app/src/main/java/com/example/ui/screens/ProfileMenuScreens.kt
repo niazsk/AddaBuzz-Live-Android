@@ -124,7 +124,7 @@ private fun ProfileOptionTile(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MenuScaffold(
+fun MenuScaffold(
     title: String,
     onBack: () -> Unit,
     snackbarHostState: SnackbarHostState? = null,

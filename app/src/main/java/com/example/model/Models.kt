@@ -124,3 +124,17 @@ data class GameResult(
     val payout: Long,
     val won: Boolean
 )
+
+data class Agent(
+    val id: String,
+    val name: String,
+    val username: String,
+    val agentCode: String,
+    val referralCode: String,
+    val referredUsers: Int,
+    val earnings: Long,
+    val level: Int,
+    val isSuperAgent: Boolean = false,
+    val isAdmin: Boolean = false,
+    val status: String = "Active"
+)

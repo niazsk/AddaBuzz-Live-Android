@@ -23,6 +23,8 @@ class SessionManager(context: Context) {
         const val KEY_RESOLUTION = "stream_resolution"
         const val KEY_MIC_MUTED = "stream_mic_muted"
         const val KEY_CAM_ENABLED = "stream_cam_enabled"
+        const val KEY_AGENT_PROGRAM = "agent_program_enabled"
+        const val KEY_AGENT_AUTO_PAYOUT = "agent_auto_payout"
 
         const val DEFAULT_SERVER_URL =
             "https://ais-dev-5rvojij5ycow7bw5erv6dc-218062420511.asia-southeast1.run.app"
@@ -144,5 +146,17 @@ class SessionManager(context: Context) {
 
     fun getAuthToken(): String? {
         return prefs.getString(KEY_AUTH_TOKEN, null)
+    }
+
+    fun isAgentProgramEnabled(): Boolean = prefs.getBoolean(KEY_AGENT_PROGRAM, true)
+
+    fun setAgentProgramEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AGENT_PROGRAM, enabled).apply()
+    }
+
+    fun isAgentAutoPayoutEnabled(): Boolean = prefs.getBoolean(KEY_AGENT_AUTO_PAYOUT, false)
+
+    fun setAgentAutoPayoutEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(KEY_AGENT_AUTO_PAYOUT, enabled).apply()
     }
 }

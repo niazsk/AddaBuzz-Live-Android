@@ -47,6 +47,7 @@ sealed class Screen(val route: String) {
     object Settings : Screen("settings")
     object Terminal : Screen("terminal")
     data class ProfileMenu(val option: ProfileMenuOption) : Screen("profile_menu")
+    data class AgentMenu(val option: AgentMenuOption) : Screen("agent_menu")
 }
 
 enum class BottomTab(
@@ -279,8 +280,24 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                         onNavigateFollowing = { navigateTo(Screen.Following) },
                         onNavigateWallet = { navigateTo(Screen.Wallet) },
                         onNavigateSettings = { navigateTo(Screen.Settings) },
-                        onNavigateMenu = { navigateTo(Screen.ProfileMenu(it)) }
+                        onNavigateMenu = { navigateTo(Screen.ProfileMenu(it)) },
+                        onNavigateAgentMenu = { navigateTo(Screen.AgentMenu(it)) }
                     )
+                }
+
+                is Screen.AgentMenu -> {
+                    BackHandler { popBack() }
+                    val option = screen.option
+                    when (option) {
+                        AgentMenuOption.AGENT -> AgentScreen(repository = repository, onBack = { popBack() })
+                        AgentMenuOption.ADD_HOST -> AddHostScreen(repository = repository, onBack = { popBack() })
+                        AgentMenuOption.INVITE_AGENT -> InviteAgentScreen(repository = repository, onBack = { popBack() })
+                        AgentMenuOption.COINS_TRADING -> CoinsTradingScreen(repository = repository, onBack = { popBack() })
+                        AgentMenuOption.AGENT_REWARDS -> AgentRewardsScreen(repository = repository, onBack = { popBack() })
+                        AgentMenuOption.AGENT_RANKING -> AgentRankingScreen(repository = repository, onBack = { popBack() })
+                        AgentMenuOption.DIAMOND_AGENT -> DiamondAgentScreen(repository = repository, onBack = { popBack() })
+                        AgentMenuOption.SUPER_AGENT_ADMIN -> SuperAgentAdminScreen(repository = repository, onBack = { popBack() })
+                    }
                 }
 
                 is Screen.ProfileMenu -> {
