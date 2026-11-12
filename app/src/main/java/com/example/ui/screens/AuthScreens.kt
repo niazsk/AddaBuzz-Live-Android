@@ -32,6 +32,8 @@ import com.example.ui.theme.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private val EMAIL_PATTERN = Regex("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")
+
 @Composable
 fun SplashScreen(
     onNavigateNext: (isAuthenticated: Boolean) -> Unit
@@ -128,14 +130,14 @@ fun LoginScreen(
     onNavigateRegister: () -> Unit
 ) {
     val coroutineScope = rememberCoroutineScope()
-    var email by remember { mutableStateOf("fayselsk@gmail.com") }
-    var password by remember { mutableStateOf("password123") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var resetSuccessMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
     var showForgotPasswordDialog by remember { mutableStateOf(false) }
-    var forgotEmail by remember { mutableStateOf("fayselsk@gmail.com") }
+    var forgotEmail by remember { mutableStateOf("") }
 
     Box(
         modifier = Modifier
@@ -264,6 +266,10 @@ fun LoginScreen(
                         errorMessage = "Please enter email and password"
                         return@Button
                     }
+                    if (!email.trim().matches(EMAIL_PATTERN)) {
+                        errorMessage = "Please enter a valid email address"
+                        return@Button
+                    }
                     isLoading = true
                     errorMessage = null
                     coroutineScope.launch {
@@ -315,7 +321,7 @@ fun LoginScreen(
                         level = 30,
                         isVip = true
                     )
-                    repository.sessionManager.saveUserSession(demo, "token_demo_quick")
+                    repository.sessionManager.saveDemoSession(demo)
                     onLoginSuccess()
                 },
                 border = ButtonDefaults.outlinedButtonBorder.copy(
@@ -382,9 +388,15 @@ fun LoginScreen(
                 Button(
                     onClick = {
                         coroutineScope.launch {
-                            repository.firebaseClient.sendPasswordReset(forgotEmail)
-                            resetSuccessMessage = "Password reset email sent for $forgotEmail"
+                            val sent = repository.firebaseClient.sendPasswordReset(forgotEmail)
                             showForgotPasswordDialog = false
+                            if (sent) {
+                                resetSuccessMessage = "Password reset email sent for $forgotEmail"
+                                errorMessage = null
+                            } else {
+                                resetSuccessMessage = null
+                                errorMessage = "Could not send reset email. Check the address and try again."
+                            }
                         }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
@@ -529,10 +541,18 @@ fun RegisterScreen(
                         errorMessage = "Please fill in all fields"
                         return@Button
                     }
+                    if (!email.trim().matches(EMAIL_PATTERN)) {
+                        errorMessage = "Please enter a valid email address"
+                        return@Button
+                    }
+                    if (password.length < 6) {
+                        errorMessage = "Password must be at least 6 characters"
+                        return@Button
+                    }
                     isLoading = true
                     errorMessage = null
                     coroutineScope.launch {
-                        when (val result = repository.firebaseClient.signUp(email, password, name)) {
+                        when (val result = repository.firebaseClient.signUp(email, password, name, username)) {
                             is FirebaseClient.AuthResult.Success -> {
                                 repository.sessionManager.saveUserSession(result.user, result.accessToken)
                                 isLoading = false

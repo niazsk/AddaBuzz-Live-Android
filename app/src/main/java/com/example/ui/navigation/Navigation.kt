@@ -66,14 +66,11 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
     val coroutineScope = rememberCoroutineScope()
     val currentUser by repository.sessionManager.currentUser.collectAsState()
 
-    var currentScreen by remember {
-        mutableStateOf<Screen>(
-            if (currentUser != null) Screen.Home else Screen.Splash
-        )
-    }
+    var currentScreen by remember { mutableStateOf<Screen>(Screen.Splash) }
 
     var selectedTab by remember { mutableStateOf(BottomTab.HOME) }
     val backStack = remember { mutableStateListOf<Screen>() }
+    var homeCategory by remember { mutableStateOf("All") }
 
     fun navigateTo(screen: Screen) {
         backStack.add(currentScreen)
@@ -117,6 +114,7 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                                 selected = isSelected,
                                 onClick = {
                                     selectedTab = tab
+                                    backStack.clear()
                                     when (tab) {
                                         BottomTab.HOME -> currentScreen = Screen.Home
                                         BottomTab.DISCOVER -> currentScreen = Screen.Discover
@@ -169,6 +167,7 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                     LoginScreen(
                         repository = repository,
                         onLoginSuccess = {
+                            backStack.clear()
                             currentScreen = Screen.Home
                             selectedTab = BottomTab.HOME
                         },
@@ -183,6 +182,7 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                     RegisterScreen(
                         repository = repository,
                         onRegisterSuccess = {
+                            backStack.clear()
                             currentScreen = Screen.Home
                             selectedTab = BottomTab.HOME
                         },
@@ -222,7 +222,9 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                             selectedTab = BottomTab.DISCOVER
                             currentScreen = Screen.Discover
                         },
-                        onNavigateCategories = { navigateTo(Screen.Categories) }
+                        onNavigateCategories = { navigateTo(Screen.Categories) },
+                        selectedCategory = homeCategory,
+                        onSelectCategory = { homeCategory = it }
                     )
                 }
 
@@ -247,7 +249,10 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                     LiveCategoriesScreen(
                         repository = repository,
                         onSelectCategory = { cat ->
-                            popBack()
+                            homeCategory = cat
+                            backStack.clear()
+                            selectedTab = BottomTab.HOME
+                            currentScreen = Screen.Home
                         },
                         onBack = { popBack() }
                     )

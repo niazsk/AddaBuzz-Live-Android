@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        repository.release()
         liveKitManager.release()
     }
 }

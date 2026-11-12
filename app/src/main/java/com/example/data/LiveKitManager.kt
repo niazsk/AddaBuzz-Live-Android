@@ -11,6 +11,7 @@ import io.livekit.android.room.participant.RemoteParticipant
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
@@ -124,6 +125,8 @@ class LiveKitManager(private val context: Context) {
     ): Boolean {
         initRoom()
         val currentRoom = room ?: return false
+        // Re-arm event collection on every join: a second join reuses the same Room instance.
+        observeRoomEvents()
         _connectionState.value = RoomState.CONNECTING
 
         return try {
@@ -137,7 +140,7 @@ class LiveKitManager(private val context: Context) {
                 }
                 currentRoom.connect(livekitWsUrl, token)
             } else {
-                // Connected in active stream session
+                // No LiveKit credentials configured: the local preview still works.
                 _connectionState.value = RoomState.CONNECTED
             }
 
@@ -156,9 +159,8 @@ class LiveKitManager(private val context: Context) {
             true
         } catch (e: Exception) {
             Log.e(TAG, "Error joining room: ${e.message}", e)
-            // Even if network fails, maintain active local stream experience
-            _connectionState.value = RoomState.CONNECTED
-            true
+            _connectionState.value = RoomState.ERROR
+            false
         }
     }
 
@@ -204,5 +206,6 @@ class LiveKitManager(private val context: Context) {
         leaveRoom()
         room?.release()
         room = null
+        scope.cancel()
     }
 }

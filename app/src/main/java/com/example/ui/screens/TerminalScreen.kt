@@ -50,6 +50,9 @@ private val TerminalAmber = Color(0xFFFBBF24)
 
 private val quickCommands = listOf("help", "status", "whoami", "rooms", "users", "wallet", "gifts", "seats", "clear")
 
+private const val MAX_LINES = 500
+private const val MAX_HISTORY = 100
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TerminalScreen(
@@ -72,6 +75,9 @@ fun TerminalScreen(
         if (trimmed.isEmpty()) return
         lines += TerminalLine("addabuzz@live:~$ $trimmed", LineKind.INPUT)
         history += trimmed
+        if (history.size > MAX_HISTORY) {
+            history.removeAt(0)
+        }
         historyIndex = -1
         val output = TerminalEngine.execute(trimmed, repository)
         output.forEach { line ->
@@ -80,6 +86,9 @@ fun TerminalScreen(
             } else {
                 lines += line
             }
+        }
+        if (lines.size > MAX_LINES) {
+            lines.subList(0, lines.size - MAX_LINES).clear()
         }
     }
 
@@ -153,9 +162,10 @@ fun TerminalScreen(
                 },
                 onHistory = { direction ->
                     if (history.isEmpty()) return@CommandInput
-                    historyIndex = when (direction) {
-                        -1 -> -1
-                        else -> (historyIndex + direction).coerceIn(0, history.lastIndex)
+                    // -1 = previous (older entry), 1 = next (newer entry)
+                    historyIndex = when {
+                        direction < 0 -> if (historyIndex < 0) history.lastIndex else (historyIndex + 1).coerceAtMost(history.lastIndex)
+                        else -> (historyIndex - 1).coerceAtLeast(-1)
                     }
                     input = if (historyIndex == -1) "" else history[historyIndex]
                 }

@@ -1,14 +1,15 @@
 package com.example.data
 
 import android.content.Context
+import android.util.Log
 import com.example.model.*
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
-import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -26,6 +28,12 @@ class AddaBuzzRepository(
     val liveKitManager: LiveKitManager
 ) {
     val firebaseClient = FirebaseClient(sessionManager)
+    companion object {
+        private const val TAG = "AddaBuzzRepository"
+        const val COINS_PER_DIAMOND = 100L
+        const val DIAMONDS_PER_COIN = 8L
+        const val MIN_TRADE_COINS = 13L
+    }
     private val firestore: FirebaseFirestore? by lazy {
         runCatching {
             if (FirebaseApp.getApps(context).isEmpty()) null else FirebaseFirestore.getInstance()
@@ -33,6 +41,8 @@ class AddaBuzzRepository(
     }
     private val scope = CoroutineScope(Dispatchers.Default)
     private var liveMessagesListener: ListenerRegistration? = null
+    private var autoReplyJob: Job? = null
+    private var dmAutoReplyJob: Job? = null
 
     // Current Active Live Room
     private val _currentRoom = MutableStateFlow<LiveRoom?>(null)
@@ -48,6 +58,10 @@ class AddaBuzzRepository(
     private val _pendingGuestRequests = MutableStateFlow<List<User>>(emptyList())
     val pendingGuestRequests: StateFlow<List<User>> = _pendingGuestRequests.asStateFlow()
 
+    // Seat index requested by each pending guest
+    private val _pendingSeatIndexes = MutableStateFlow<Map<String, Int>>(emptyMap())
+    val pendingSeatIndexes: StateFlow<Map<String, Int>> = _pendingSeatIndexes.asStateFlow()
+
     // Live Room Chat Messages
     private val _liveMessages = MutableStateFlow<List<ChatMessage>>(emptyList())
     val liveMessages: StateFlow<List<ChatMessage>> = _liveMessages.asStateFlow()
@@ -59,6 +73,10 @@ class AddaBuzzRepository(
     // Reactions counter
     private val _reactionCount = MutableStateFlow(3420L)
     val reactionCount: StateFlow<Long> = _reactionCount.asStateFlow()
+
+    // Increments only on new reactions, used to trigger the hearts animation
+    private val _reactionBurstId = MutableStateFlow(0L)
+    val reactionBurstId: StateFlow<Long> = _reactionBurstId.asStateFlow()
 
     // All Live Rooms
     private val _allRooms = MutableStateFlow<List<LiveRoom>>(emptyList())
@@ -441,9 +459,13 @@ class AddaBuzzRepository(
             .document(roomId)
             .collection("messages")
             .orderBy("timestamp", Query.Direction.ASCENDING)
+            .limit(200)
             .addSnapshotListener { snapshots, error ->
-                if (error != null) return@addSnapshotListener
-                val messages = snapshots?.mapNotNull { doc ->
+                if (error != null) {
+                    Log.w(TAG, "Chat listener error: ${error.message}")
+                    return@addSnapshotListener
+                }
+                val remoteMessages = snapshots?.mapNotNull { doc ->
                     val data = doc.data ?: return@mapNotNull null
                     val senderId = data["sender_id"] as? String ?: return@mapNotNull null
                     ChatMessage(
@@ -456,20 +478,45 @@ class AddaBuzzRepository(
                             avatarUrl = (data["sender_avatar"] as? String) ?: ""
                         ),
                         text = (data["text"] as? String) ?: "",
-                        timestamp = (data["timestamp"] as? Long) ?: System.currentTimeMillis(),
+                        timestamp = readTimestamp(data["timestamp"]),
                         isGift = (data["is_gift"] as? Boolean) ?: false,
                         giftName = data["gift_name"] as? String,
                         giftIcon = data["gift_icon"] as? String,
-                        giftAmount = (data["gift_amount"] as? Long)?.toInt()
+                        giftAmount = (data["gift_amount"] as? Number)?.toInt()
                     )
                 } ?: emptyList()
-                _liveMessages.value = messages
+
+                // Merge instead of replace so locally seeded and optimistically sent
+                // messages survive remote snapshots.
+                val merged = LinkedHashMap<String, ChatMessage>()
+                _liveMessages.value.forEach { merged[it.id] = it }
+                remoteMessages.forEach { merged[it.id] = it }
+                _liveMessages.value = merged.values.sortedBy { it.timestamp }
             }
+    }
+
+    private fun readTimestamp(value: Any?): Long = when (value) {
+        is Long -> value
+        is Number -> value.toLong()
+        is com.google.firebase.Timestamp -> value.toDate().time
+        else -> System.currentTimeMillis()
     }
 
     fun stopLiveRoomMessagesListener() {
         liveMessagesListener?.remove()
         liveMessagesListener = null
+    }
+
+    fun markAllNotificationsRead() {
+        if (_notifications.value.none { !it.isRead }) return
+        _notifications.value = _notifications.value.map { it.copy(isRead = true) }
+    }
+
+    fun markConversationRead(conversationId: String) {
+        if (_conversations.value.none { it.id == conversationId && it.unreadCount > 0 }) return
+        _conversations.value = _conversations.value.map {
+            if (it.id == conversationId) it.copy(unreadCount = 0) else it
+        }
     }
 
     // Gift Catalog (priced in Coins)
@@ -570,7 +617,7 @@ class AddaBuzzRepository(
         liveKitManager.joinRoom(
             serverUrl = sessionManager.getServerUrl(),
             token = room.livekitToken.ifBlank { "token_${room.id}_${System.currentTimeMillis()}" },
-            isVideoRoom = room.roomType != RoomType.AUDIO,
+            isVideoRoom = room.roomType == RoomType.VIDEO,
             asPublisher = asHost
         )
 
@@ -610,9 +657,12 @@ class AddaBuzzRepository(
         )
         _liveMessages.value = _liveMessages.value + msg
 
-        // Persist live room chat message to Firebase Firestore
-        val roomId = _currentRoom.value?.id ?: "room_${System.currentTimeMillis()}"
-        firestore?.collection("live_rooms")?.document(roomId)?.collection("messages")
+        val room = _currentRoom.value
+        if (room == null) {
+            Log.w(TAG, "sendLiveMessage skipped: no active room")
+            return
+        }
+        firestore?.collection("live_rooms")?.document(room.id)?.collection("messages")
             ?.add(
                 hashMapOf(
                     "sender_id" to user.id,
@@ -621,14 +671,18 @@ class AddaBuzzRepository(
                     "sender_avatar" to user.avatarUrl,
                     "sender_email" to user.email,
                     "text" to text,
-                    "timestamp" to FieldValue.serverTimestamp(),
+                    "timestamp" to System.currentTimeMillis(),
                     "is_gift" to false
                 )
             )
+            ?.addOnFailureListener { Log.w(TAG, "Failed to send chat message: ${it.message}") }
 
         // Add auto-reply from audience after slight delay for lively experience
-        scope.launch {
+        autoReplyJob?.cancel()
+        autoReplyJob = scope.launch {
             delay(2500)
+            val activeRoomId = _currentRoom.value?.id
+            if (activeRoomId != room.id) return@launch
             val audienceReplies = listOf(
                 "Awesome stream! 🔥",
                 "Can you sing that acoustic track again? 🎵",
@@ -674,24 +728,28 @@ class AddaBuzzRepository(
         _liveMessages.value = _liveMessages.value + giftMessage
         _giftCelebrationEvent.tryEmit(giftMessage)
 
-        // Persist gift message to Firebase Firestore
-        val roomId = _currentRoom.value?.id ?: "room_${System.currentTimeMillis()}"
-        firestore?.collection("live_rooms")?.document(roomId)?.collection("messages")
-            ?.add(
-                hashMapOf(
-                    "sender_id" to user.id,
-                    "sender_username" to user.username,
-                    "sender_name" to user.displayName,
-                    "sender_avatar" to user.avatarUrl,
-                    "sender_email" to user.email,
-                    "text" to "Sent ${gift.name} ${gift.iconEmoji} (${gift.coinPrice} 🪙)",
-                    "timestamp" to FieldValue.serverTimestamp(),
-                    "is_gift" to true,
-                    "gift_name" to gift.name,
-                    "gift_icon" to gift.iconEmoji,
-                    "gift_amount" to gift.coinPrice.toLong()
+        val room = _currentRoom.value
+        if (room != null) {
+            firestore?.collection("live_rooms")?.document(room.id)?.collection("messages")
+                ?.add(
+                    hashMapOf(
+                        "sender_id" to user.id,
+                        "sender_username" to user.username,
+                        "sender_name" to user.displayName,
+                        "sender_avatar" to user.avatarUrl,
+                        "sender_email" to user.email,
+                        "text" to "Sent ${gift.name} ${gift.iconEmoji} (${gift.coinPrice} 🪙)",
+                        "timestamp" to System.currentTimeMillis(),
+                        "is_gift" to true,
+                        "gift_name" to gift.name,
+                        "gift_icon" to gift.iconEmoji,
+                        "gift_amount" to gift.coinPrice.toLong()
+                    )
                 )
-            )
+                ?.addOnFailureListener { Log.w(TAG, "Failed to send gift message: ${it.message}") }
+        } else {
+            Log.w(TAG, "Gift not persisted: no active room")
+        }
 
         // Log transaction (coin spend)
         val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
@@ -705,12 +763,13 @@ class AddaBuzzRepository(
         )
         _transactions.value = listOf(tx) + _transactions.value
 
-        // Increase host withdrawable diamonds (earnings)
-        _currentRoom.value?.host?.let { host ->
+        // The host earns from gifts sent by others; the sender only pays.
+        val host = room?.host
+        val localUserId = sessionManager.currentUser.value?.id
+        if (host != null && host.id == localUserId && host.id != user.id) {
             val earnedDiamonds = (gift.coinPrice * 0.7).toLong()
-            if (host.id == user.id) {
-                sessionManager.updateDiamonds(user.diamonds + earnedDiamonds)
-            }
+            val currentDiamonds = sessionManager.currentUser.value?.diamonds ?: 0L
+            sessionManager.updateDiamonds(currentDiamonds + earnedDiamonds)
         }
 
         return true
@@ -718,13 +777,17 @@ class AddaBuzzRepository(
 
     fun addReaction() {
         _reactionCount.value = _reactionCount.value + 1
+        _reactionBurstId.value = _reactionBurstId.value + 1
     }
 
     // 8 Multi-Guest Room Seat Actions
-    fun requestSeat(): Boolean {
+    fun requestSeat(seatIndex: Int? = null): Boolean {
         val user = sessionManager.currentUser.value ?: return false
         if (_pendingGuestRequests.value.none { it.id == user.id }) {
             _pendingGuestRequests.value = _pendingGuestRequests.value + user
+            if (seatIndex != null) {
+                _pendingSeatIndexes.value = _pendingSeatIndexes.value + (user.id to seatIndex)
+            }
             return true
         }
         return false
@@ -732,8 +795,12 @@ class AddaBuzzRepository(
 
     fun acceptGuestRequest(user: User, targetSeatIndex: Int? = null) {
         _pendingGuestRequests.value = _pendingGuestRequests.value.filter { it.id != user.id }
+        val requestedIndex = _pendingSeatIndexes.value[user.id]
+        _pendingSeatIndexes.value = _pendingSeatIndexes.value - user.id
         val seats = _guestSeats.value.toMutableList()
-        val emptyIndex = targetSeatIndex ?: seats.indexOfFirst { it.guest == null && !it.isLocked }
+        val emptyIndex = targetSeatIndex
+            ?: requestedIndex?.takeIf { it in seats.indices && seats[it].guest == null && !seats[it].isLocked }
+            ?: seats.indexOfFirst { it.guest == null && !it.isLocked }
         if (emptyIndex != -1 && emptyIndex in seats.indices) {
             seats[emptyIndex] = seats[emptyIndex].copy(
                 guest = user,
@@ -746,6 +813,7 @@ class AddaBuzzRepository(
 
     fun rejectGuestRequest(user: User) {
         _pendingGuestRequests.value = _pendingGuestRequests.value.filter { it.id != user.id }
+        _pendingSeatIndexes.value = _pendingSeatIndexes.value - user.id
     }
 
     fun toggleSeatLock(seatIndex: Int) {
@@ -863,13 +931,15 @@ class AddaBuzzRepository(
                 hashMapOf(
                     "sender_id" to "me",
                     "text" to text,
-                    "timestamp" to FieldValue.serverTimestamp(),
+                    "timestamp" to System.currentTimeMillis(),
                     "is_from_me" to true
                 )
             )
+            ?.addOnFailureListener { Log.w(TAG, "Failed to send direct message: ${it.message}") }
 
         // Friendly auto-reply simulation
-        scope.launch {
+        dmAutoReplyJob?.cancel()
+        dmAutoReplyJob = scope.launch {
             delay(1500)
             val autoReply = PrivateMessage(
                 id = "dm_reply_${System.currentTimeMillis()}",
@@ -926,11 +996,12 @@ class AddaBuzzRepository(
         val roll = (1..6).random()
         val won = roll == pick
         val payout = if (won) wager * 2 else 0L
-        sessionManager.updateCoins(user.coins - wager + payout)
+        val netDelta = payout - wager
+        sessionManager.updateCoins(user.coins + netDelta)
         recordTransaction(
             title = "Dice Duel — rolled $roll, picked $pick",
-            amount = if (won) "+$payout 🪙" else "-$wager 🪙",
-            isCredit = won,
+            amount = (if (netDelta >= 0) "+$netDelta" else "$netDelta") + " 🪙",
+            isCredit = netDelta >= 0,
             type = "GAME"
         )
         return GameResult(roll = roll, pick = pick, wager = wager, payout = payout, won = won)
@@ -985,15 +1056,22 @@ class AddaBuzzRepository(
     // Coins Trading: 100 coins -> 8 diamonds
     fun tradeCoinsForDiamonds(coins: Long): Long {
         val user = sessionManager.currentUser.value ?: return 0
-        if (coins <= 0 || user.coins < coins) return 0
-        val diamonds = coins * 8 / 100
+        if (coins < MIN_TRADE_COINS || user.coins < coins) return 0
+        val diamonds = coins * DIAMONDS_PER_COIN / COINS_PER_DIAMOND
         if (diamonds <= 0) return 0
         sessionManager.updateCoins(user.coins - coins)
-        sessionManager.updateDiamonds(user.diamonds + diamonds)
+        val newDiamonds = (sessionManager.currentUser.value?.diamonds ?: user.diamonds) + diamonds
+        sessionManager.updateDiamonds(newDiamonds)
         recordTransaction(
             title = "Traded $coins coins for $diamonds diamonds",
             amount = "+$diamonds 💎",
             isCredit = true,
+            type = "TRADE"
+        )
+        recordTransaction(
+            title = "Coins traded for diamonds",
+            amount = "-$coins 🪙",
+            isCredit = false,
             type = "TRADE"
         )
         return diamonds
@@ -1027,5 +1105,12 @@ class AddaBuzzRepository(
         )
         _allRooms.value = listOf(newRoom) + _allRooms.value
         return newRoom
+    }
+
+    fun release() {
+        stopLiveRoomMessagesListener()
+        autoReplyJob?.cancel()
+        dmAutoReplyJob?.cancel()
+        scope.cancel()
     }
 }

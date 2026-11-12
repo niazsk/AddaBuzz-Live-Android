@@ -408,7 +408,9 @@ fun GuestSeatsGrid(
             columns = GridCells.Fixed(4),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(190.dp)
         ) {
             items(seats) { seat ->
                 GuestSeatItem(
@@ -608,7 +610,9 @@ fun GiftBottomSheet(
                 columns = GridCells.Fixed(3),
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(230.dp)
             ) {
                 items(gifts) { gift ->
                     val isSelected = selectedGift?.id == gift.id
@@ -719,7 +723,7 @@ fun FloatingHeartsBurst(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        hearts.forEach { heart ->
+        hearts.toList().forEach { heart ->
             KeyedFloatingHeart(heart = heart) {
                 hearts.remove(heart)
             }
@@ -773,6 +777,33 @@ fun CameraPreview(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val boundSelector = remember { mutableStateOf<CameraSelector?>(null) }
+
+    fun bind(previewView: PreviewView, front: Boolean) {
+        try {
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
+            cameraProviderFuture.addListener({
+                try {
+                    val cameraProvider = cameraProviderFuture.get()
+                    val preview = Preview.Builder().build().also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+                    val cameraSelector = if (front) {
+                        CameraSelector.DEFAULT_FRONT_CAMERA
+                    } else {
+                        CameraSelector.DEFAULT_BACK_CAMERA
+                    }
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
+                    boundSelector.value = cameraSelector
+                } catch (e: Exception) {
+                    // Camera binding fallback
+                }
+            }, ContextCompat.getMainExecutor(context))
+        } catch (e: Exception) {
+            // ignore
+        }
+    }
 
     AndroidView(
         factory = { ctx ->
@@ -783,54 +814,27 @@ fun CameraPreview(
                 )
                 scaleType = PreviewView.ScaleType.FILL_CENTER
             }
-
-            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
-            cameraProviderFuture.addListener({
-                try {
-                    val cameraProvider = cameraProviderFuture.get()
-                    val preview = Preview.Builder().build().also {
-                        it.setSurfaceProvider(previewView.surfaceProvider)
-                    }
-
-                    val cameraSelector = if (isFrontCamera) {
-                        CameraSelector.DEFAULT_FRONT_CAMERA
-                    } else {
-                        CameraSelector.DEFAULT_BACK_CAMERA
-                    }
-
-                    cameraProvider.unbindAll()
-                    cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
-                } catch (e: Exception) {
-                    // Camera binding fallback
-                }
-            }, ContextCompat.getMainExecutor(ctx))
-
+            bind(previewView, isFrontCamera)
             previewView
         },
         update = { previewView ->
-            try {
-                val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
-                cameraProviderFuture.addListener({
-                    try {
-                        val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
-                        val cameraSelector = if (isFrontCamera) {
-                            CameraSelector.DEFAULT_FRONT_CAMERA
-                        } else {
-                            CameraSelector.DEFAULT_BACK_CAMERA
-                        }
-                        cameraProvider.unbindAll()
-                        cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview)
-                    } catch (e: Exception) {
-                        // ignore
-                    }
-                }, ContextCompat.getMainExecutor(context))
-            } catch (e: Exception) {
-                // ignore
+            val desired = if (isFrontCamera) {
+                CameraSelector.DEFAULT_FRONT_CAMERA
+            } else {
+                CameraSelector.DEFAULT_BACK_CAMERA
+            }
+            if (boundSelector.value != desired) {
+                bind(previewView, isFrontCamera)
             }
         },
         modifier = modifier
     )
+
+    DisposableEffect(Unit) {
+        onDispose {
+            runCatching {
+                ProcessCameraProvider.getInstance(context).get().unbindAll()
+            }
+        }
+    }
 }

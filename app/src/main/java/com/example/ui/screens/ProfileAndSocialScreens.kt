@@ -43,6 +43,8 @@ fun UserProfileScreen(
 ) {
     val currentUser by repository.sessionManager.currentUser.collectAsState()
     val user = currentUser ?: return
+    val followers by repository.followersUsers.collectAsState()
+    val following by repository.followingUsers.collectAsState()
     var selectedAgentOption by remember { mutableStateOf<AgentMenuOption?>(null) }
 
     Scaffold(
@@ -134,7 +136,7 @@ fun UserProfileScreen(
                                 modifier = Modifier.clickable { onNavigateFollowers() }
                             ) {
                                 Text(
-                                    text = "${user.followersCount}",
+                                    text = "${followers.size}",
                                     style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
                                 )
                                 Text(
@@ -153,7 +155,7 @@ fun UserProfileScreen(
                                 modifier = Modifier.clickable { onNavigateFollowing() }
                             ) {
                                 Text(
-                                    text = "${user.followingCount}",
+                                    text = "${following.size}",
                                     style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
                                 )
                                 Text(
@@ -335,6 +337,7 @@ fun FollowersScreen(
     onBack: () -> Unit
 ) {
     val followers by repository.followersUsers.collectAsState()
+    val following by repository.followingUsers.collectAsState()
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -396,7 +399,10 @@ fun FollowersScreen(
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp)
                         ) {
-                            Text("Follow", style = Typography.labelSmall.copy(fontWeight = FontWeight.Bold))
+                            Text(
+                                text = if (following.any { it.id == user.id }) "Following" else "Follow",
+                                style = Typography.labelSmall.copy(fontWeight = FontWeight.Bold)
+                            )
                         }
                     }
                 }
@@ -512,6 +518,10 @@ fun PrivateMessagesScreen(
         val conv = activeConversation!!
         val msgs = directMessages[conv.id] ?: emptyList()
 
+        LaunchedEffect(conv.id) {
+            repository.markConversationRead(conv.id)
+        }
+
         Scaffold(
             containerColor = BackgroundDark,
             topBar = {
@@ -533,7 +543,10 @@ fun PrivateMessagesScreen(
                         }
                     },
                     navigationIcon = {
-                        IconButton(onClick = { activeConversation = null }) {
+                        IconButton(onClick = {
+                            activeConversation = null
+                            messageText = ""
+                        }) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
                         }
                     },
@@ -642,7 +655,10 @@ fun PrivateMessagesScreen(
                         colors = CardDefaults.cardColors(containerColor = SurfaceCard),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { activeConversation = conv }
+                            .clickable {
+                                messageText = ""
+                                activeConversation = conv
+                            }
                     ) {
                         Row(
                             modifier = Modifier
@@ -701,6 +717,10 @@ fun NotificationsScreen(
 ) {
     val notifications by repository.notifications.collectAsState()
     var selectedFilter by remember { mutableStateOf("All") }
+
+    LaunchedEffect(Unit) {
+        repository.markAllNotificationsRead()
+    }
 
     val filteredList = remember(notifications, selectedFilter) {
         when (selectedFilter) {

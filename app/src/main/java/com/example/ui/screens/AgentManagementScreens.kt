@@ -629,6 +629,12 @@ fun CoinsTradingScreen(
                 Button(
                     onClick = {
                         val coins = amount.toLongOrNull() ?: 0
+                        if (coins < AddaBuzzRepository.MIN_TRADE_COINS) {
+                            scope.launch {
+                                snackbarHostState.showSnackbar("Minimum trade is ${AddaBuzzRepository.MIN_TRADE_COINS} coins")
+                            }
+                            return@Button
+                        }
                         val diamonds = repository.tradeCoinsForDiamonds(coins)
                         if (diamonds > 0) {
                             scope.launch { snackbarHostState.showSnackbar("Traded $coins coins for $diamonds diamonds") }

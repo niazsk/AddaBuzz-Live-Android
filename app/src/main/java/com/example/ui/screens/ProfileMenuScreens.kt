@@ -199,7 +199,7 @@ fun RewardScreen(
                 Column(horizontalAlignment = Alignment.End) {
                     Text("Tasks claimed", style = Typography.labelSmall.copy(color = TextSecondary))
                     Text(
-                        text = "${claimed.size}/${tasks.size}",
+                        text = "${claimed.count { id -> tasks.any { it.id == id } }}/${tasks.size}",
                         style = Typography.titleMedium.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
                     )
                 }
@@ -294,10 +294,13 @@ fun RankScreen(
     onBack: () -> Unit
 ) {
     val currentUser by repository.sessionManager.currentUser.collectAsState()
-    val ranked = remember(repository.allRooms.value, repository.followingUsers.value, repository.followersUsers.value) {
-        (repository.allRooms.value.map { it.host } +
-            repository.followingUsers.value +
-            repository.followersUsers.value).distinctBy { it.id }
+    val allRooms by repository.allRooms.collectAsState()
+    val followingUsers by repository.followingUsers.collectAsState()
+    val followersUsers by repository.followersUsers.collectAsState()
+    val ranked = remember(allRooms, followingUsers, followersUsers) {
+        (allRooms.map { it.host } +
+            followingUsers +
+            followersUsers).distinctBy { it.id }
             .sortedByDescending { it.followersCount }
     }
 
@@ -873,8 +876,10 @@ fun FanClubScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    val creators = remember(repository.allRooms.value, repository.followingUsers.value) {
-        (repository.allRooms.value.map { it.host } + repository.followingUsers.value).distinctBy { it.id }
+    val allRooms by repository.allRooms.collectAsState()
+    val followingUsers by repository.followingUsers.collectAsState()
+    val creators = remember(allRooms, followingUsers) {
+        (allRooms.map { it.host } + followingUsers).distinctBy { it.id }
     }
     val joinCost = 500L
 
@@ -969,6 +974,7 @@ fun MedalWallScreen(
 ) {
     val user by repository.sessionManager.currentUser.collectAsState()
     val transactions by repository.transactions.collectAsState()
+    val allRooms by repository.allRooms.collectAsState()
 
     val medals = listOf(
         Medal("🌱", "First Steps", "Joined AddaBuzz Live", true),
@@ -977,7 +983,7 @@ fun MedalWallScreen(
         Medal("💎", "Top Giver", "Hold 1,000 coins", (user?.coins ?: 0) >= 1000),
         Medal("👥", "Social Butterfly", "Get 100 followers", (user?.followersCount ?: 0) >= 100),
         Medal("🎲", "Gamer", "Play a game in the app", transactions.any { it.type == "GAME" }),
-        Medal("🎬", "Streamer", "Start your own live room", repository.allRooms.value.any { it.host.id == user?.id }),
+        Medal("🎬", "Streamer", "Start your own live room", allRooms.any { it.host.id == user?.id }),
         Medal("🏆", "Legend", "Reach level 25", (user?.level ?: 0) >= 25)
     )
     val earned = medals.count { it.earned }

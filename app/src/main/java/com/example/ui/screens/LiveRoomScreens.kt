@@ -60,14 +60,21 @@ fun LiveRoomScreen(
     val currentUser by repository.sessionManager.currentUser.collectAsState()
     val liveMessages by repository.liveMessages.collectAsState()
     val reactionCount by repository.reactionCount.collectAsState()
+    val reactionBurstId by repository.reactionBurstId.collectAsState()
     val connectionState by repository.liveKitManager.connectionState.collectAsState()
     val isMicEnabled by repository.liveKitManager.isMicEnabled.collectAsState()
     val isFrontCamera by repository.liveKitManager.isFrontCamera.collectAsState()
+    val followingUsers by repository.followingUsers.collectAsState()
 
     var showGiftSheet by remember { mutableStateOf(false) }
     var chatInput by remember { mutableStateOf("") }
     var celebrationMessage by remember { mutableStateOf<String?>(null) }
+    var giftErrorMessage by remember { mutableStateOf<String?>(null) }
     var isFollowingHost by remember { mutableStateOf(false) }
+
+    LaunchedEffect(room.host.id, followingUsers) {
+        isFollowingHost = followingUsers.any { it.id == room.host.id }
+    }
 
     // Camera & Mic Permissions launcher
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -153,7 +160,7 @@ fun LiveRoomScreen(
         )
 
         // Floating Hearts Bursts
-        FloatingHeartsBurst(triggerCount = reactionCount)
+        FloatingHeartsBurst(triggerCount = reactionBurstId)
 
         // Celebration Banner
         AnimatedVisibility(
@@ -181,6 +188,24 @@ fun LiveRoomScreen(
                         style = Typography.titleMedium.copy(color = GoldCoin, fontWeight = FontWeight.Bold)
                     )
                 }
+            }
+        }
+
+        // Insufficient balance notice
+        if (giftErrorMessage != null) {
+            Surface(
+                shape = RoundedCornerShape(12.dp),
+                color = LiveRed.copy(alpha = 0.9f),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(top = 130.dp, start = 24.dp, end = 24.dp)
+            ) {
+                Text(
+                    text = giftErrorMessage ?: "",
+                    style = Typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                )
             }
         }
 
@@ -227,8 +252,7 @@ fun LiveRoomScreen(
                         Spacer(modifier = Modifier.width(8.dp))
                         Button(
                             onClick = {
-                                isFollowingHost = !isFollowingHost
-                                repository.toggleFollow(room.host)
+                                isFollowingHost = repository.toggleFollow(room.host)
                             },
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isFollowingHost) SurfaceGlass else PurplePrimary
@@ -439,7 +463,12 @@ fun LiveRoomScreen(
             coins = currentUser?.coins ?: 0L,
             onSendGift = { gift ->
                 val sent = repository.sendGift(gift)
-                if (sent) showGiftSheet = false
+                if (sent) {
+                    giftErrorMessage = null
+                    showGiftSheet = false
+                } else {
+                    giftErrorMessage = "Not enough coins for ${gift.name} (${gift.coinPrice} 🪙). Top up to send it."
+                }
             },
             onRechargeClick = {
                 showGiftSheet = false
@@ -464,6 +493,7 @@ fun MultiGuestRoomScreen(
     val currentUser by repository.sessionManager.currentUser.collectAsState()
     val guestSeats by repository.guestSeats.collectAsState()
     val pendingRequests by repository.pendingGuestRequests.collectAsState()
+    val pendingSeatIndexes by repository.pendingSeatIndexes.collectAsState()
     val liveMessages by repository.liveMessages.collectAsState()
     val isMicEnabled by repository.liveKitManager.isMicEnabled.collectAsState()
 
@@ -614,7 +644,7 @@ fun MultiGuestRoomScreen(
                         if (isHost) {
                             selectedSeatForHostManage = seat
                         } else if (seat.guest == null && !seat.isLocked) {
-                            repository.requestSeat()
+                            repository.requestSeat(seat.index)
                             requestStatusMessage = "Requested to take Seat ${seat.index + 1}!"
                         }
                     }
@@ -829,10 +859,19 @@ fun MultiGuestRoomScreen(
                                             .clip(CircleShape)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = reqUser.displayName,
-                                        style = Typography.labelLarge.copy(color = TextPrimary)
-                                    )
+                                    Column {
+                                        Text(
+                                            text = reqUser.displayName,
+                                            style = Typography.labelLarge.copy(color = TextPrimary)
+                                        )
+                                        val requestedSeat = pendingSeatIndexes[reqUser.id]
+                                        if (requestedSeat != null) {
+                                            Text(
+                                                text = "Wants Seat ${requestedSeat + 1}",
+                                                style = Typography.labelSmall.copy(color = ElectricCyan)
+                                            )
+                                        }
+                                    }
                                 }
                                 Row {
                                     IconButton(onClick = { repository.acceptGuestRequest(reqUser) }) {
@@ -861,7 +900,12 @@ fun MultiGuestRoomScreen(
             coins = currentUser?.coins ?: 0L,
             onSendGift = { gift ->
                 val sent = repository.sendGift(gift)
-                if (sent) showGiftSheet = false
+                if (sent) {
+                    requestStatusMessage = "Sent ${gift.name} ${gift.iconEmoji}!"
+                    showGiftSheet = false
+                } else {
+                    requestStatusMessage = "Not enough coins for ${gift.name} (${gift.coinPrice} 🪙)."
+                }
             },
             onRechargeClick = {
                 showGiftSheet = false

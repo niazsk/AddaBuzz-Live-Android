@@ -45,24 +45,30 @@ fun HomeScreen(
     onWalletClick: () -> Unit,
     onNotificationsClick: () -> Unit,
     onSearchClick: () -> Unit,
-    onNavigateCategories: () -> Unit
+    onNavigateCategories: () -> Unit,
+    selectedCategory: String = "All",
+    onSelectCategory: (String) -> Unit = {}
 ) {
     val currentUser by repository.sessionManager.currentUser.collectAsState()
     val allRooms by repository.allRooms.collectAsState()
     val notifications by repository.notifications.collectAsState()
     val unreadNotifs = remember(notifications) { notifications.count { !it.isRead } }
 
-    var selectedCategory by remember { mutableStateOf("All") }
     var showStartLiveDialog by remember { mutableStateOf(false) }
 
     val categories = listOf("All", "Music & Adda", "Audio Party", "Gaming Arena", "Multi-Guest", "Education & Tech")
 
     val filteredRooms = remember(allRooms, selectedCategory) {
         if (selectedCategory == "All") allRooms
-        else allRooms.filter { it.category.contains(selectedCategory, ignoreCase = true) }
+        else allRooms.filter { room ->
+            when (selectedCategory) {
+                "Multi-Guest" -> room.roomType == RoomType.MULTI_GUEST
+                else -> room.category.contains(selectedCategory, ignoreCase = true)
+            }
+        }
     }
 
-    val featuredRoom = allRooms.firstOrNull()
+    val featuredRoom = filteredRooms.firstOrNull()
 
     Scaffold(
         topBar = {
@@ -148,7 +154,7 @@ fun HomeScreen(
                             shape = RoundedCornerShape(20.dp),
                             color = if (isSelected) PurplePrimary else SurfaceCard,
                             border = if (!isSelected) CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(PurplePrimary.copy(alpha = 0.3f), ElectricCyan.copy(alpha = 0.3f)))) else null,
-                            modifier = Modifier.clickable { selectedCategory = cat }
+                            modifier = Modifier.clickable { onSelectCategory(cat) }
                         ) {
                             Text(
                                 text = cat,
@@ -382,6 +388,49 @@ fun StartLiveDialog(
                         }
                     }
                 }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Category",
+                    style = Typography.labelLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("Music & Adda", "Audio Party", "Gaming Arena", "Education & Tech").chunked(2).forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            row.forEach { cat ->
+                                val isSelected = category == cat
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = if (isSelected) PurplePrimary else SurfaceCard,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable { category = cat }
+                                ) {
+                                    Text(
+                                        text = cat,
+                                        style = Typography.labelSmall.copy(
+                                            color = if (isSelected) Color.White else TextSecondary,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                        ),
+                                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                            if (row.size == 1) Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -412,14 +461,17 @@ fun DiscoverScreen(
     val allRooms by repository.allRooms.collectAsState()
     val following by repository.followingUsers.collectAsState()
 
-    val hashtags = listOf("#AddaParty", "#BanglaBeats", "#LateNightTalk", "#GamingZone", "#SingWithMe", "#TechAdda")
+    val hashtags = remember(allRooms) {
+        allRooms.flatMap { it.tags }.distinct().take(10)
+    }
 
     val searchResults = remember(allRooms, searchQuery) {
         if (searchQuery.isBlank()) allRooms
         else allRooms.filter {
             it.title.contains(searchQuery, ignoreCase = true) ||
                     it.host.displayName.contains(searchQuery, ignoreCase = true) ||
-                    it.category.contains(searchQuery, ignoreCase = true)
+                    it.category.contains(searchQuery, ignoreCase = true) ||
+                    it.tags.any { tag -> tag.contains(searchQuery, ignoreCase = true) }
         }
     }
 
@@ -589,13 +641,10 @@ fun LiveCategoriesScreen(
     onBack: () -> Unit
 ) {
     val categoryList = listOf(
-        Pair("Chit-Chat (Adda)", "🎙️ 1.2k Streams"),
-        Pair("Music & Acoustic", "🎸 890 Streams"),
+        Pair("Music & Adda", "🎸 1.2k Streams"),
+        Pair("Audio Party", "👥 650 Streams"),
         Pair("Gaming Arena", "🎮 3.4k Streams"),
-        Pair("8-Guest Audio Party", "👥 650 Streams"),
-        Pair("PK Battles", "⚔️ 420 Streams"),
-        Pair("Talents & Comedy", "🎭 510 Streams"),
-        Pair("Late Night Talk", "🌙 380 Streams"),
+        Pair("Multi-Guest", "👥 420 Streams"),
         Pair("Education & Tech", "💻 230 Streams")
     )
 

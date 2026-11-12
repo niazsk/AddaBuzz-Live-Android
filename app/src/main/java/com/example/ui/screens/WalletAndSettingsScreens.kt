@@ -44,6 +44,7 @@ fun WalletScreen(
     var showWithdrawDialog by remember { mutableStateOf(false) }
     var diamondsToWithdraw by remember { mutableStateOf("1000") }
     var withdrawSuccess by remember { mutableStateOf<Long?>(null) }
+    var withdrawError by remember { mutableStateOf<String?>(null) }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -190,12 +191,7 @@ fun WalletScreen(
                             shape = RoundedCornerShape(18.dp),
                             colors = CardDefaults.cardColors(containerColor = SurfaceCard),
                             border = if (pkg.isHot) CardDefaults.outlinedCardBorder().copy(width = 1.5.dp, brush = Brush.horizontalGradient(listOf(NeonPink, ElectricCyan))) else null,
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable {
-                                    repository.rechargeCoins(pkg)
-                                    showRechargeSuccessDialog = pkg
-                                }
+                            modifier = Modifier.weight(1f)
                         ) {
                             Column(
                                 modifier = Modifier
@@ -341,8 +337,13 @@ fun WalletScreen(
                 Button(
                     onClick = {
                         val amount = diamondsToWithdraw.toLongOrNull() ?: 0L
-                        if (repository.withdrawDiamonds(amount)) {
+                        if (amount <= 0) {
+                            withdrawError = "Enter a valid diamond amount"
+                        } else if (repository.withdrawDiamonds(amount)) {
                             withdrawSuccess = amount
+                            withdrawError = null
+                        } else {
+                            withdrawError = "Not enough diamonds to withdraw $amount"
                         }
                         showWithdrawDialog = false
                     },
@@ -367,6 +368,20 @@ fun WalletScreen(
             text = { Text("$amount Diamonds withdrawal request submitted.", style = Typography.bodyMedium.copy(color = TextSecondary)) },
             confirmButton = {
                 Button(onClick = { withdrawSuccess = null }, colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)) {
+                    Text("OK")
+                }
+            }
+        )
+    }
+
+    withdrawError?.let { message ->
+        AlertDialog(
+            onDismissRequest = { withdrawError = null },
+            containerColor = SurfaceDark,
+            title = { Text("Withdrawal Failed", style = Typography.titleLarge.copy(color = LiveRed, fontWeight = FontWeight.Bold)) },
+            text = { Text(message, style = Typography.bodyMedium.copy(color = TextSecondary)) },
+            confirmButton = {
+                Button(onClick = { withdrawError = null }, colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)) {
                     Text("OK")
                 }
             }
@@ -458,8 +473,8 @@ fun SettingsScreen(
     val sessionManager = repository.sessionManager
     var serverUrl by remember { mutableStateOf(sessionManager.getServerUrl()) }
     var resolution by remember { mutableStateOf(sessionManager.getStreamResolution()) }
-    var allowNotifications by remember { mutableStateOf(true) }
-    var privateMode by remember { mutableStateOf(false) }
+    var allowNotifications by remember { mutableStateOf(sessionManager.isAllowNotificationsEnabled()) }
+    var privateMode by remember { mutableStateOf(sessionManager.isPrivateModeEnabled()) }
     var showUrlSavedToast by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
@@ -577,7 +592,10 @@ fun SettingsScreen(
                 Text("Gift & Live Notifications", style = Typography.bodyLarge.copy(color = TextPrimary))
                 Switch(
                     checked = allowNotifications,
-                    onCheckedChange = { allowNotifications = it },
+                    onCheckedChange = {
+                        allowNotifications = it
+                        sessionManager.setAllowNotificationsEnabled(it)
+                    },
                     colors = SwitchDefaults.colors(checkedThumbColor = ElectricCyan, checkedTrackColor = PurplePrimary)
                 )
             }
@@ -592,7 +610,10 @@ fun SettingsScreen(
                 Text("Anonymous Viewer Mode", style = Typography.bodyLarge.copy(color = TextPrimary))
                 Switch(
                     checked = privateMode,
-                    onCheckedChange = { privateMode = it },
+                    onCheckedChange = {
+                        privateMode = it
+                        sessionManager.setPrivateModeEnabled(it)
+                    },
                     colors = SwitchDefaults.colors(checkedThumbColor = ElectricCyan, checkedTrackColor = PurplePrimary)
                 )
             }

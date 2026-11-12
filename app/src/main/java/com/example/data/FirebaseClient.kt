@@ -16,6 +16,8 @@ class FirebaseClient(
     companion object {
         private const val TAG = "FirebaseClient"
         private const val DEFAULT_AVATAR = "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200"
+        private const val STARTING_COINS = 500L
+        private const val STARTING_DIAMONDS = 1000L
     }
 
     private val auth: FirebaseAuth
@@ -69,19 +71,25 @@ class FirebaseClient(
     /**
      * Sign Up with Email and Password using Firebase Auth
      */
-    suspend fun signUp(email: String, password: String, displayName: String): AuthResult = withContext(Dispatchers.IO) {
+    suspend fun signUp(email: String, password: String, displayName: String, username: String = ""): AuthResult = withContext(Dispatchers.IO) {
+        var firebaseUser: FirebaseUser? = null
         try {
             val result = Tasks.await(auth.createUserWithEmailAndPassword(email.trim(), password))
-            val firebaseUser = result.user
+            firebaseUser = result.user
                 ?: throw IllegalStateException("Firebase sign up failed: no user returned")
             val name = displayName.ifBlank { email.substringBefore("@") }
-            if (name.isNotBlank()) {
-                Tasks.await(firebaseUser.updateProfile(UserProfileChangeRequest.Builder().setDisplayName(name).build()))
-            }
-            val idTokenResult = Tasks.await(firebaseUser.getIdToken(false))
-            val accessToken = idTokenResult.token
-                ?: throw IllegalStateException("Firebase token is null")
-            AuthResult.Success(toUser(firebaseUser, email, accessToken), accessToken)
+            // Profile/token are best-effort: the account already exists at this point,
+            // so a failure here must not be reported as a failed sign up.
+            runCatching {
+                Tasks.await(firebaseUser!!.updateProfile(UserProfileChangeRequest.Builder().setDisplayName(name).build()))
+            }.onFailure { Log.w(TAG, "updateProfile failed: ${it.message}") }
+            val accessToken = runCatching { Tasks.await(firebaseUser!!.getIdToken(false)).token }
+                .getOrNull()
+                ?: ""
+            AuthResult.Success(
+                toUser(firebaseUser!!, email, accessToken, isNewUser = true, usernameOverride = username),
+                accessToken
+            )
         } catch (e: Exception) {
             Log.w(TAG, "Firebase signUp error: ${e.message}")
             AuthResult.Error(e.message ?: "Firebase sign up failed")
@@ -101,19 +109,31 @@ class FirebaseClient(
         }
     }
 
-    private fun toUser(firebaseUser: FirebaseUser, email: String, accessToken: String): User {
+    private fun toUser(
+        firebaseUser: FirebaseUser,
+        email: String,
+        accessToken: String,
+        isNewUser: Boolean = false,
+        usernameOverride: String = ""
+    ): User {
         val userEmail = firebaseUser.email ?: email
         val displayName = firebaseUser.displayName ?: email.substringBefore("@").replaceFirstChar { it.uppercase() }
         val avatarUrl = firebaseUser.photoUrl?.toString() ?: DEFAULT_AVATAR
+        // A demo session's balances are not real, so a real sign-in must not inherit them.
+        val storedCoins = if (sessionManager.isDemoSession()) null else sessionManager.storedCoins()
+        val storedDiamonds = if (sessionManager.isDemoSession()) null else sessionManager.storedDiamonds()
+        val coins = if (isNewUser) STARTING_COINS else (storedCoins ?: STARTING_COINS)
+        val diamonds = if (isNewUser) STARTING_DIAMONDS else (storedDiamonds ?: STARTING_DIAMONDS)
+        val username = usernameOverride.trim().removePrefix("@").ifBlank { userEmail.substringBefore("@") }
         return User(
             id = firebaseUser.uid,
-            username = userEmail.substringBefore("@"),
+            username = username,
             displayName = displayName,
             email = userEmail,
             avatarUrl = avatarUrl,
             bio = "AddaBuzz Live Creator 🌟",
-            coins = 3000,
-            diamonds = 7500
+            coins = coins,
+            diamonds = diamonds
         )
     }
 }
