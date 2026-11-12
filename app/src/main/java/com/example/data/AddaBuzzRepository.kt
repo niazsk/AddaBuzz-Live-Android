@@ -87,6 +87,14 @@ class AddaBuzzRepository(
     private val _transactions = MutableStateFlow<List<WalletTransaction>>(emptyList())
     val transactions: StateFlow<List<WalletTransaction>> = _transactions.asStateFlow()
 
+    // Claimed daily reward task ids
+    private val _claimedRewards = MutableStateFlow<Set<String>>(emptySet())
+    val claimedRewards: StateFlow<Set<String>> = _claimedRewards.asStateFlow()
+
+    // Creator fan clubs the user has joined
+    private val _fanClubMemberships = MutableStateFlow<Set<String>>(emptySet())
+    val fanClubMemberships: StateFlow<Set<String>> = _fanClubMemberships.asStateFlow()
+
     init {
         seedInitialData()
     }
@@ -805,6 +813,70 @@ class AddaBuzzRepository(
             updatedMap2[conversationId] = (updatedMap2[conversationId] ?: emptyList()) + autoReply
             _directMessages.value = updatedMap2
         }
+    }
+
+    // Reward tasks: claim once, coins are credited to the wallet
+    fun claimReward(rewardId: String, coins: Long): Boolean {
+        val user = sessionManager.currentUser.value ?: return false
+        if (_claimedRewards.value.contains(rewardId)) return false
+        _claimedRewards.value = _claimedRewards.value + rewardId
+        sessionManager.updateCoins(user.coins + coins)
+        recordTransaction("Reward: ${rewardId.replace('_', ' ')}", "+$coins 🪙", isCredit = true, type = "REWARD")
+        return true
+    }
+
+    // Store purchase: spend coins on a gift item
+    fun buyGift(gift: Gift): Boolean {
+        val user = sessionManager.currentUser.value ?: return false
+        if (user.coins < gift.coinPrice) return false
+        sessionManager.updateCoins(user.coins - gift.coinPrice)
+        recordTransaction("Bought ${gift.name} ${gift.iconEmoji}", "-${gift.coinPrice} 🪙", isCredit = false, type = "STORE")
+        return true
+    }
+
+    // Fan club membership
+    fun joinFanClub(hostId: String, costCoins: Long): Boolean {
+        val user = sessionManager.currentUser.value ?: return false
+        if (_fanClubMemberships.value.contains(hostId)) return true
+        if (user.coins < costCoins) return false
+        sessionManager.updateCoins(user.coins - costCoins)
+        _fanClubMemberships.value = _fanClubMemberships.value + hostId
+        recordTransaction("Joined fan club", "-$costCoins 🪙", isCredit = false, type = "FAN_CLUB")
+        return true
+    }
+
+    fun leaveFanClub(hostId: String) {
+        _fanClubMemberships.value = _fanClubMemberships.value - hostId
+    }
+
+    // Dice Duel: predict a number, win double the wager
+    fun playDiceGame(wager: Long, pick: Int): GameResult? {
+        val user = sessionManager.currentUser.value ?: return null
+        if (pick !in 1..6 || wager <= 0 || user.coins < wager) return null
+        val roll = (1..6).random()
+        val won = roll == pick
+        val payout = if (won) wager * 2 else 0L
+        sessionManager.updateCoins(user.coins - wager + payout)
+        recordTransaction(
+            title = "Dice Duel — rolled $roll, picked $pick",
+            amount = if (won) "+$payout 🪙" else "-$wager 🪙",
+            isCredit = won,
+            type = "GAME"
+        )
+        return GameResult(roll = roll, pick = pick, wager = wager, payout = payout, won = won)
+    }
+
+    private fun recordTransaction(title: String, amount: String, isCredit: Boolean, type: String) {
+        val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
+        val tx = WalletTransaction(
+            id = "tx_${System.currentTimeMillis()}",
+            title = title,
+            amount = amount,
+            date = dateFormat.format(Date()),
+            isCredit = isCredit,
+            type = type
+        )
+        _transactions.value = listOf(tx) + _transactions.value
     }
 
     // Create a new stream

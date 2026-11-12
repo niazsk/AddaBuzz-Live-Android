@@ -45,6 +45,8 @@ sealed class Screen(val route: String) {
     object Wallet : Screen("wallet")
     object GiftCatalog : Screen("gift_catalog")
     object Settings : Screen("settings")
+    object Terminal : Screen("terminal")
+    data class ProfileMenu(val option: ProfileMenuOption) : Screen("profile_menu")
 }
 
 enum class BottomTab(
@@ -276,8 +278,24 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                         onNavigateFollowers = { navigateTo(Screen.Followers) },
                         onNavigateFollowing = { navigateTo(Screen.Following) },
                         onNavigateWallet = { navigateTo(Screen.Wallet) },
-                        onNavigateSettings = { navigateTo(Screen.Settings) }
+                        onNavigateSettings = { navigateTo(Screen.Settings) },
+                        onNavigateMenu = { navigateTo(Screen.ProfileMenu(it)) }
                     )
+                }
+
+                is Screen.ProfileMenu -> {
+                    BackHandler { popBack() }
+                    val option = screen.option
+                    when (option) {
+                        ProfileMenuOption.REWARD -> RewardScreen(repository = repository, onBack = { popBack() })
+                        ProfileMenuOption.RANK -> RankScreen(repository = repository, onBack = { popBack() })
+                        ProfileMenuOption.GAMES -> GamesScreen(repository = repository, onBack = { popBack() })
+                        ProfileMenuOption.STORE -> StoreScreen(repository = repository, onBack = { popBack() })
+                        ProfileMenuOption.INVITE -> InviteScreen(repository = repository, onBack = { popBack() })
+                        ProfileMenuOption.HONOR_LEVEL -> HonorLevelScreen(repository = repository, onBack = { popBack() })
+                        ProfileMenuOption.FAN_CLUB -> FanClubScreen(repository = repository, onBack = { popBack() })
+                        ProfileMenuOption.MEDAL_WALL -> MedalWallScreen(repository = repository, onBack = { popBack() })
+                    }
                 }
 
                 is Screen.Followers -> {
@@ -347,6 +365,15 @@ fun AddaBuzzApp(repository: AddaBuzzRepository) {
                             currentScreen = Screen.Login
                             backStack.clear()
                         },
+                        onOpenTerminal = { navigateTo(Screen.Terminal) },
+                        onBack = { popBack() }
+                    )
+                }
+
+                is Screen.Terminal -> {
+                    BackHandler { popBack() }
+                    TerminalScreen(
+                        repository = repository,
                         onBack = { popBack() }
                     )
                 }

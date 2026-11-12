@@ -116,3 +116,11 @@ data class PrivateMessage(
     val timestamp: Long,
     val isFromMe: Boolean = true
 )
+
+data class GameResult(
+    val roll: Int,
+    val pick: Int,
+    val wager: Long,
+    val payout: Long,
+    val won: Boolean
+)

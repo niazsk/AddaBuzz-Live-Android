@@ -452,6 +452,7 @@ fun GiftCatalogScreen(
 fun SettingsScreen(
     repository: AddaBuzzRepository,
     onLogout: () -> Unit,
+    onOpenTerminal: () -> Unit,
     onBack: () -> Unit
 ) {
     val sessionManager = repository.sessionManager
@@ -594,6 +595,56 @@ fun SettingsScreen(
                     onCheckedChange = { privateMode = it },
                     colors = SwitchDefaults.colors(checkedThumbColor = ElectricCyan, checkedTrackColor = PurplePrimary)
                 )
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Developer Tools
+            Text(
+                text = "Developer",
+                style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ElectricCyan)
+            )
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenTerminal() }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Terminal,
+                            contentDescription = null,
+                            tint = ElectricCyan,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "In-App Terminal",
+                                style = Typography.bodyLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
+                            )
+                            Text(
+                                text = "Run shell commands against live app state",
+                                style = Typography.labelSmall.copy(color = TextSecondary)
+                            )
+                        }
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = TextSecondary
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))

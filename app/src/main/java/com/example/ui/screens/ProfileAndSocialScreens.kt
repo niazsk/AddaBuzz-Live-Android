@@ -37,7 +37,8 @@ fun UserProfileScreen(
     onNavigateFollowers: () -> Unit,
     onNavigateFollowing: () -> Unit,
     onNavigateWallet: () -> Unit,
-    onNavigateSettings: () -> Unit
+    onNavigateSettings: () -> Unit,
+    onNavigateMenu: (ProfileMenuOption) -> Unit
 ) {
     val currentUser by repository.sessionManager.currentUser.collectAsState()
     val user = currentUser ?: return
@@ -161,6 +162,12 @@ fun UserProfileScreen(
                         }
                     }
                 }
+            }
+
+            // Profile Options Grid (Reward, Rank, Games, Store, ...)
+            item {
+                Spacer(modifier = Modifier.height(16.dp))
+                ProfileOptionsGrid(onSelect = onNavigateMenu)
             }
 
             // Coins & Diamonds Options
