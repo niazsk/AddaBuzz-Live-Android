@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -26,11 +27,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.AddaBuzzRepository
-import com.example.data.FirebaseClient
 import com.example.model.Gift
 import com.example.model.RechargePackage
 import com.example.ui.theme.*
-import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,8 +41,9 @@ fun WalletScreen(
     val transactions by repository.transactions.collectAsState()
 
     var showRechargeSuccessDialog by remember { mutableStateOf<RechargePackage?>(null) }
-    var showExchangeDialog by remember { mutableStateOf(false) }
-    var beansToExchange by remember { mutableStateOf("1000") }
+    var showWithdrawDialog by remember { mutableStateOf(false) }
+    var diamondsToWithdraw by remember { mutableStateOf("1000") }
+    var withdrawSuccess by remember { mutableStateOf<Long?>(null) }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -65,13 +65,13 @@ fun WalletScreen(
                 .padding(padding),
             contentPadding = PaddingValues(16.dp)
         ) {
-            // Balance Cards (Diamonds & Beans)
+            // Balance Cards (Coins & Diamonds)
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Diamonds Card
+                    // Coins Card (spendable)
                     Card(
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = SurfaceCard),
@@ -90,21 +90,21 @@ fun WalletScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Diamonds", style = Typography.labelMedium.copy(color = TextSecondary))
-                                Text("💎", fontSize = 18.sp)
+                                Text("Coins", style = Typography.labelMedium.copy(color = TextSecondary))
+                                Text("🪙", fontSize = 18.sp)
                             }
                             Text(
-                                text = "${currentUser?.diamonds ?: 0}",
+                                text = "${currentUser?.coins ?: 0}",
                                 style = Typography.headlineLarge.copy(
                                     color = ElectricCyan,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
-                            Text("Use for live gifts", style = Typography.labelSmall.copy(color = TextSecondary))
+                            Text("Use for gifts & everything", style = Typography.labelSmall.copy(color = TextSecondary))
                         }
                     }
 
-                    // Beans Card
+                    // Diamonds Card (withdraw-only)
                     Card(
                         shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = SurfaceCard),
@@ -123,31 +123,31 @@ fun WalletScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text("Beans Earned", style = Typography.labelMedium.copy(color = TextSecondary))
-                                Text("🫘", fontSize = 18.sp)
+                                Text("Diamonds (Withdraw)", style = Typography.labelMedium.copy(color = TextSecondary))
+                                Text("💎", fontSize = 18.sp)
                             }
                             Text(
-                                text = "${currentUser?.beans ?: 0}",
+                                text = "${currentUser?.diamonds ?: 0}",
                                 style = Typography.headlineLarge.copy(
                                     color = GoldCoin,
                                     fontWeight = FontWeight.Bold
                                 )
                             )
                             Text(
-                                text = "Exchange to 💎",
+                                text = "Withdraw only",
                                 style = Typography.labelSmall.copy(color = NeonPink, fontWeight = FontWeight.Bold),
-                                modifier = Modifier.clickable { showExchangeDialog = true }
+                                modifier = Modifier.clickable { showWithdrawDialog = true }
                             )
                         }
                     }
                 }
             }
 
-            // Quick Exchange Beans Button
+            // Quick Withdraw Diamonds Button
             item {
                 Spacer(modifier = Modifier.height(14.dp))
                 Button(
-                    onClick = { showExchangeDialog = true },
+                    onClick = { showWithdrawDialog = true },
                     colors = ButtonDefaults.buttonColors(containerColor = SurfaceCard),
                     border = ButtonDefaults.outlinedButtonBorder.copy(
                         brush = Brush.horizontalGradient(listOf(PurplePrimary, GoldCoin))
@@ -156,18 +156,23 @@ fun WalletScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "🫘 Convert Beans into Diamonds / Rewards",
+                        text = "💎 Withdraw Diamonds",
                         style = Typography.labelLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)
                     )
                 }
             }
 
-            // Diamond Recharge Packages Header
+            // Coin Recharge Packages Header
             item {
                 Spacer(modifier = Modifier.height(24.dp))
                 Text(
-                    text = "Top-Up Diamonds",
+                    text = "Top-Up Coins",
                     style = Typography.titleLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "Coins দিয়ে gifts, support ও সব in-app কাজ করা যাবে",
+                    style = Typography.bodySmall.copy(color = TextSecondary)
                 )
                 Spacer(modifier = Modifier.height(12.dp))
             }
@@ -188,7 +193,7 @@ fun WalletScreen(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable {
-                                    repository.rechargeDiamonds(pkg)
+                                    repository.rechargeCoins(pkg)
                                     showRechargeSuccessDialog = pkg
                                 }
                         ) {
@@ -209,14 +214,14 @@ fun WalletScreen(
                                     }
                                     Spacer(modifier = Modifier.height(6.dp))
                                 }
-                                Text("💎 ${pkg.diamonds}", style = Typography.titleLarge.copy(color = ElectricCyan, fontWeight = FontWeight.Bold))
-                                if (pkg.bonusDiamonds > 0) {
-                                    Text("+${pkg.bonusDiamonds} Bonus", style = Typography.labelSmall.copy(color = GoldCoin, fontWeight = FontWeight.Bold))
+                                Text("🪙 ${pkg.coins}", style = Typography.titleLarge.copy(color = ElectricCyan, fontWeight = FontWeight.Bold))
+                                if (pkg.bonusCoins > 0) {
+                                    Text("+${pkg.bonusCoins} Bonus", style = Typography.labelSmall.copy(color = GoldCoin, fontWeight = FontWeight.Bold))
                                 }
                                 Spacer(modifier = Modifier.height(10.dp))
                                 Button(
                                     onClick = {
-                                        repository.rechargeDiamonds(pkg)
+                                        repository.rechargeCoins(pkg)
                                         showRechargeSuccessDialog = pkg
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary),
@@ -283,11 +288,11 @@ fun WalletScreen(
             onDismissRequest = { showRechargeSuccessDialog = null },
             containerColor = SurfaceDark,
             title = {
-                Text("Recharge Successful! 🎉", style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
+                Text("Top-Up Successful! 🎉", style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
             },
             text = {
                 Text(
-                    text = "Added ${pkg.diamonds + pkg.bonusDiamonds} Diamonds to your AddaBuzz wallet! Enjoy gifting streamers.",
+                    text = "Added ${pkg.coins + pkg.bonusCoins} Coins to your AddaBuzz wallet. Coins দিয়ে এখন gifts ও সব in-app কাজ করা যাবে।",
                     style = Typography.bodyMedium.copy(color = TextSecondary)
                 )
             },
@@ -302,25 +307,25 @@ fun WalletScreen(
         )
     }
 
-    // Exchange Beans Dialog
-    if (showExchangeDialog) {
+    // Withdraw Diamonds Dialog (Diamonds are withdraw-only)
+    if (showWithdrawDialog) {
         AlertDialog(
-            onDismissRequest = { showExchangeDialog = false },
+            onDismissRequest = { showWithdrawDialog = false },
             containerColor = SurfaceDark,
             title = {
-                Text("Exchange Beans to 💎", style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
+                Text("Withdraw Diamonds 💎", style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold))
             },
             text = {
                 Column {
                     Text(
-                        text = "Current Beans: ${currentUser?.beans ?: 0}\nExchange Rate: 2 Beans = 1 Diamond 💎",
+                        text = "Withdrawable Diamonds: ${currentUser?.diamonds ?: 0}\nDiamonds শুধু withdraw করা যাবে। Coins দিয়ে in-app সব কাজ করুন।",
                         style = Typography.bodyMedium.copy(color = TextSecondary)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
-                        value = beansToExchange,
-                        onValueChange = { beansToExchange = it.filter { char -> char.isDigit() } },
-                        label = { Text("Beans to convert") },
+                        value = diamondsToWithdraw,
+                        onValueChange = { diamondsToWithdraw = it.filter { char -> char.isDigit() } },
+                        label = { Text("Diamonds to withdraw") },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedBorderColor = ElectricCyan,
                             unfocusedBorderColor = SurfaceCardBorder,
@@ -335,18 +340,34 @@ fun WalletScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val amount = beansToExchange.toLongOrNull() ?: 0L
-                        repository.exchangeBeansToDiamonds(amount)
-                        showExchangeDialog = false
+                        val amount = diamondsToWithdraw.toLongOrNull() ?: 0L
+                        if (repository.withdrawDiamonds(amount)) {
+                            withdrawSuccess = amount
+                        }
+                        showWithdrawDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)
                 ) {
-                    Text("Exchange Now")
+                    Text("Withdraw")
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showExchangeDialog = false }) {
+                TextButton(onClick = { showWithdrawDialog = false }) {
                     Text("Cancel", color = TextSecondary)
+                }
+            }
+        )
+    }
+
+    withdrawSuccess?.let { amount ->
+        AlertDialog(
+            onDismissRequest = { withdrawSuccess = null },
+            containerColor = SurfaceDark,
+            title = { Text("Withdrawal Requested", style = Typography.titleLarge.copy(color = TextPrimary, fontWeight = FontWeight.Bold)) },
+            text = { Text("$amount Diamonds withdrawal request submitted.", style = Typography.bodyMedium.copy(color = TextSecondary)) },
+            confirmButton = {
+                Button(onClick = { withdrawSuccess = null }, colors = ButtonDefaults.buttonColors(containerColor = PurplePrimary)) {
+                    Text("OK")
                 }
             }
         )
@@ -413,7 +434,7 @@ fun GiftCatalogScreen(
                             color = PurplePrimary.copy(alpha = 0.3f)
                         ) {
                             Text(
-                                text = "💎 ${gift.diamondPrice}",
+                                text = "🪙 ${gift.coinPrice}",
                                 style = Typography.labelLarge.copy(color = ElectricCyan, fontWeight = FontWeight.Bold),
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
                             )
@@ -441,11 +462,6 @@ fun SettingsScreen(
     var showUrlSavedToast by remember { mutableStateOf(false) }
 
     val coroutineScope = rememberCoroutineScope()
-    var firebaseApiKey by remember { mutableStateOf(sessionManager.getFirebaseApiKey()) }
-    var firebaseProjectId by remember { mutableStateOf(sessionManager.getFirebaseProjectId()) }
-    var isTestingFirebase by remember { mutableStateOf(false) }
-    var firebaseTestResult by remember { mutableStateOf<FirebaseClient.ConnectionTestResult?>(null) }
-    var showFirebaseSavedToast by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = BackgroundDark,
@@ -468,208 +484,6 @@ fun SettingsScreen(
                 .padding(16.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            // Firebase Cloud Integration Card
-            Card(
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = SurfaceCard),
-                border = CardDefaults.outlinedCardBorder().copy(
-                    width = 1.5.dp,
-                    brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan, PurplePrimary))
-                ),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(GoldCoin.copy(alpha = 0.2f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text("🔥", fontSize = 20.sp)
-                        }
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Column {
-                            Text(
-                                text = "Firebase Cloud (firebase.google.com)",
-                                style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
-                            )
-                            Text(
-                                text = "Firebase Auth & Realtime Database",
-                                style = Typography.labelSmall.copy(color = GoldCoin, fontWeight = FontWeight.Bold)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    Text(
-                        text = "Connect directly to your Firebase project for persistent user auth and realtime syncing across Web and Android.",
-                        style = Typography.bodyMedium.copy(color = TextSecondary, fontSize = 13.sp)
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    OutlinedTextField(
-                        value = firebaseApiKey,
-                        onValueChange = { firebaseApiKey = it },
-                        label = { Text("Firebase API Key") },
-                        placeholder = { Text("AIza...") },
-                        leadingIcon = { Icon(Icons.Default.Key, contentDescription = null, tint = ElectricCyan) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ElectricCyan,
-                            unfocusedBorderColor = SurfaceCardBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedContainerColor = SurfaceDark,
-                            unfocusedContainerColor = SurfaceDark
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    OutlinedTextField(
-                        value = firebaseProjectId,
-                        onValueChange = { firebaseProjectId = it },
-                        label = { Text("Firebase Project ID") },
-                        placeholder = { Text("adda-buzz-live") },
-                        leadingIcon = { Icon(Icons.Default.Link, contentDescription = null, tint = ElectricCyan) },
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = ElectricCyan,
-                            unfocusedBorderColor = SurfaceCardBorder,
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary,
-                            focusedContainerColor = SurfaceDark,
-                            unfocusedContainerColor = SurfaceDark
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Buttons: Test Connection & Save
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        OutlinedButton(
-                            onClick = {
-                                if (firebaseApiKey.isBlank()) {
-                                    firebaseTestResult = FirebaseClient.ConnectionTestResult.Failed(
-                                        "Please enter your Firebase API Key first (from Firebase Console -> Project Settings -> General -> Your apps -> Android app)"
-                                    )
-                                } else {
-                                    isTestingFirebase = true
-                                    firebaseTestResult = null
-                                    coroutineScope.launch {
-                                        val result = repository.firebaseClient.testConnection(firebaseApiKey, firebaseProjectId)
-                                        firebaseTestResult = result
-                                        isTestingFirebase = false
-                                    }
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            border = ButtonDefaults.outlinedButtonBorder.copy(
-                                brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan))
-                            ),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            if (isTestingFirebase) {
-                                CircularProgressIndicator(color = GoldCoin, modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                            } else {
-                                Icon(Icons.Default.NetworkCheck, contentDescription = null, tint = GoldCoin, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Test Connection", style = Typography.labelMedium.copy(color = GoldCoin, fontWeight = FontWeight.Bold))
-                            }
-                        }
-
-                        Button(
-                            onClick = {
-                                sessionManager.setFirebaseApiKey(firebaseApiKey)
-                                sessionManager.setFirebaseProjectId(firebaseProjectId)
-                                showFirebaseSavedToast = true
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = GoldCoin),
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(Icons.Default.Save, contentDescription = null, tint = Color.White, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text("Save Config", style = Typography.labelMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
-                        }
-                    }
-
-                    // Test Result Feedback
-                    firebaseTestResult?.let { result ->
-                        Spacer(modifier = Modifier.height(10.dp))
-                        when (result) {
-                            is FirebaseClient.ConnectionTestResult.Connected -> {
-                                Surface(
-                                    color = ElectricCyan.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan))),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = ElectricCyan)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Column {
-                                            Text(
-                                                text = "Connected to Firebase! 🚀",
-                                                style = Typography.labelMedium.copy(color = ElectricCyan, fontWeight = FontWeight.Bold)
-                                            )
-                                            Text(
-                                                text = "Latency: ${result.latencyMs}ms • Firebase Auth reachable",
-                                                style = Typography.labelSmall.copy(color = TextSecondary)
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                            is FirebaseClient.ConnectionTestResult.Failed -> {
-                                Surface(
-                                    color = LiveRed.copy(alpha = 0.15f),
-                                    shape = RoundedCornerShape(10.dp),
-                                    modifier = Modifier.fillMaxWidth()
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(10.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(Icons.Default.ErrorOutline, contentDescription = null, tint = LiveRed)
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text(
-                                            text = result.error,
-                                            style = Typography.labelSmall.copy(color = LiveRed)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (showFirebaseSavedToast) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "Firebase configuration saved!",
-                            color = GoldCoin,
-                            style = Typography.labelSmall.copy(fontWeight = FontWeight.Bold)
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
             // Backend Integration Section
             Text(
                 text = "LiveKit & Web Server Integration",
@@ -821,7 +635,7 @@ fun SettingsScreen(
                     .fillMaxWidth()
                     .height(50.dp)
             ) {
-                Icon(Icons.Default.ExitToApp, contentDescription = null, tint = Color.White)
+                Icon(Icons.AutoMirrored.Filled.ExitToApp, contentDescription = null, tint = Color.White)
                 Spacer(modifier = Modifier.width(8.dp))
                 Text("Sign Out", style = Typography.titleMedium.copy(color = Color.White, fontWeight = FontWeight.Bold))
             }

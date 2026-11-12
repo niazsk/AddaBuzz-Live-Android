@@ -6,6 +6,7 @@ import com.google.android.gms.tasks.Tasks
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.auth.UserProfileChangeRequest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -35,10 +36,10 @@ class FirebaseClient(
      */
     suspend fun testConnection(apiKey: String, projectId: String): ConnectionTestResult = withContext(Dispatchers.IO) {
         val startTime = System.currentTimeMillis()
-        return try {
+        try {
             val app = FirebaseApp.getInstance()
             ConnectionTestResult.Connected(
-                message = "Successfully connected to Firebase Auth (project: ${app.projectId})",
+                message = "Successfully connected to Firebase Auth (project: $projectId)",
                 latencyMs = System.currentTimeMillis() - startTime
             )
         } catch (e: Exception) {
@@ -51,10 +52,13 @@ class FirebaseClient(
      * Sign In with Email and Password using Firebase Auth
      */
     suspend fun signIn(email: String, password: String): AuthResult = withContext(Dispatchers.IO) {
-        return try {
+        try {
             val result = Tasks.await(auth.signInWithEmailAndPassword(email.trim(), password))
-            val firebaseUser: FirebaseUser = result.user
-            val accessToken = Tasks.await(firebaseUser.getIdToken())
+            val firebaseUser = result.user
+                ?: throw IllegalStateException("Firebase sign in failed: no user returned")
+            val idTokenResult = Tasks.await(firebaseUser.getIdToken(false))
+            val accessToken = idTokenResult.token
+                ?: throw IllegalStateException("Firebase token is null")
             AuthResult.Success(toUser(firebaseUser, email, accessToken), accessToken)
         } catch (e: Exception) {
             Log.w(TAG, "Firebase signIn error: ${e.message}")
@@ -66,14 +70,17 @@ class FirebaseClient(
      * Sign Up with Email and Password using Firebase Auth
      */
     suspend fun signUp(email: String, password: String, displayName: String): AuthResult = withContext(Dispatchers.IO) {
-        return try {
+        try {
             val result = Tasks.await(auth.createUserWithEmailAndPassword(email.trim(), password))
-            val firebaseUser: FirebaseUser = result.user
+            val firebaseUser = result.user
+                ?: throw IllegalStateException("Firebase sign up failed: no user returned")
             val name = displayName.ifBlank { email.substringBefore("@") }
             if (name.isNotBlank()) {
-                runCatching { Tasks.await(firebaseUser.updateDisplayName(name)) }
+                Tasks.await(firebaseUser.updateProfile(UserProfileChangeRequest.Builder().setDisplayName(name).build()))
             }
-            val accessToken = Tasks.await(firebaseUser.getIdToken())
+            val idTokenResult = Tasks.await(firebaseUser.getIdToken(false))
+            val accessToken = idTokenResult.token
+                ?: throw IllegalStateException("Firebase token is null")
             AuthResult.Success(toUser(firebaseUser, email, accessToken), accessToken)
         } catch (e: Exception) {
             Log.w(TAG, "Firebase signUp error: ${e.message}")
@@ -85,7 +92,7 @@ class FirebaseClient(
      * Password Recovery via Firebase Auth
      */
     suspend fun sendPasswordReset(email: String): Boolean = withContext(Dispatchers.IO) {
-        return try {
+        try {
             Tasks.await(auth.sendPasswordResetEmail(email.trim()))
             true
         } catch (e: Exception) {
@@ -105,8 +112,8 @@ class FirebaseClient(
             email = userEmail,
             avatarUrl = avatarUrl,
             bio = "AddaBuzz Live Creator 🌟",
-            diamonds = 3000,
-            beans = 7500
+            coins = 3000,
+            diamonds = 7500
         )
     }
 }

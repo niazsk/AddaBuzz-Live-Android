@@ -44,7 +44,7 @@ import kotlin.random.Random
 
 @Composable
 fun AddaBuzzTopBar(
-    diamonds: Long,
+    coins: Long,
     unreadNotifications: Int,
     onWalletClick: () -> Unit,
     onNotificationsClick: () -> Unit,
@@ -102,9 +102,9 @@ fun AddaBuzzTopBar(
                 }
             }
 
-            // Right Actions: Diamonds Pill, Search, Notification
+            // Right Actions: Coins Pill, Search, Notification
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Diamond Balance Pill
+                // Coin Balance Pill
                 Surface(
                     shape = RoundedCornerShape(20.dp),
                     color = SurfaceCard,
@@ -117,10 +117,10 @@ fun AddaBuzzTopBar(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(text = "💎", fontSize = 13.sp)
+                        Text(text = "🪙", fontSize = 13.sp)
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = diamonds.toString(),
+                            text = coins.toString(),
                             style = Typography.labelLarge.copy(
                                 color = ElectricCyan,
                                 fontWeight = FontWeight.Bold
@@ -554,7 +554,7 @@ fun GuestSeatItem(
 @Composable
 fun GiftBottomSheet(
     gifts: List<Gift>,
-    diamonds: Long,
+    coins: Long,
     onSendGift: (Gift) -> Unit,
     onRechargeClick: () -> Unit,
     onDismiss: () -> Unit
@@ -573,7 +573,7 @@ fun GiftBottomSheet(
                 .padding(horizontal = 16.dp, vertical = 8.dp)
                 .navigationBarsPadding()
         ) {
-            // Header with Diamonds balance & Recharge button
+            // Header with Coins balance & Recharge button
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -587,7 +587,7 @@ fun GiftBottomSheet(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "💎 $diamonds", style = Typography.titleMedium.copy(color = ElectricCyan, fontWeight = FontWeight.Bold))
+                    Text(text = "🪙 $coins", style = Typography.titleMedium.copy(color = ElectricCyan, fontWeight = FontWeight.Bold))
                     Spacer(modifier = Modifier.width(8.dp))
                     Button(
                         onClick = onRechargeClick,
@@ -596,7 +596,7 @@ fun GiftBottomSheet(
                         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
                         modifier = Modifier.height(32.dp)
                     ) {
-                        Text(text = "Recharge", style = Typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold))
+                        Text(text = "Top Up Coins", style = Typography.labelSmall.copy(color = Color.White, fontWeight = FontWeight.Bold))
                     }
                 }
             }
@@ -645,7 +645,7 @@ fun GiftBottomSheet(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "💎 ${gift.diamondPrice}",
+                                text = "🪙 ${gift.coinPrice}",
                                 style = Typography.labelSmall.copy(
                                     color = ElectricCyan,
                                     fontWeight = FontWeight.Bold
@@ -675,7 +675,7 @@ fun GiftBottomSheet(
             ) {
                 selectedGift?.let { g ->
                     Text(
-                        text = "Send ${g.name} (${g.diamondPrice} 💎)",
+                        text = "Send ${g.name} (${g.coinPrice} 🪙)",
                         style = Typography.titleMedium.copy(
                             color = Color.White,
                             fontWeight = FontWeight.Bold

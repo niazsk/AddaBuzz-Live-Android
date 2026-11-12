@@ -436,7 +436,7 @@ fun LiveRoomScreen(
     if (showGiftSheet) {
         GiftBottomSheet(
             gifts = repository.availableGifts,
-            diamonds = currentUser?.diamonds ?: 0L,
+            coins = currentUser?.coins ?: 0L,
             onSendGift = { gift ->
                 val sent = repository.sendGift(gift)
                 if (sent) showGiftSheet = false
@@ -858,7 +858,7 @@ fun MultiGuestRoomScreen(
     if (showGiftSheet) {
         GiftBottomSheet(
             gifts = repository.availableGifts,
-            diamonds = currentUser?.diamonds ?: 0L,
+            coins = currentUser?.coins ?: 0L,
             onSendGift = { gift ->
                 val sent = repository.sendGift(gift)
                 if (sent) showGiftSheet = false

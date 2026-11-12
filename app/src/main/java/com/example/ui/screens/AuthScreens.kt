@@ -104,7 +104,7 @@ fun SplashScreen(
                 border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(PurplePrimary, ElectricCyan)))
             ) {
                 Text(
-                    text = "⚡ Firebase Powered Auth & Realtime",
+                    text = "⚡ Secure Auth & Realtime",
                     style = Typography.labelSmall.copy(color = ElectricCyan, fontWeight = FontWeight.Bold),
                     modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp)
                 )
@@ -175,30 +175,9 @@ fun LoginScreen(
                 style = Typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
             )
             Text(
-                text = "Sign in with Firebase to join live streams & 8-seat rooms",
+                text = "Sign in to join live streams & 8-seat rooms",
                 style = Typography.bodyMedium.copy(color = TextSecondary, textAlign = TextAlign.Center)
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Firebase Badge
-            Surface(
-                shape = RoundedCornerShape(12.dp),
-                color = GoldCoin.copy(alpha = 0.15f),
-                border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(GoldCoin, ElectricCyan)))
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GoldCoin))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Firebase Auth Active",
-                        style = Typography.labelSmall.copy(color = GoldCoin, fontWeight = FontWeight.Bold)
-                    )
-                }
-            }
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -311,7 +290,7 @@ fun LoginScreen(
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
                     Text(
-                        text = "Sign In with Firebase",
+                        text = "Sign In",
                         style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White)
                     )
                 }
@@ -331,8 +310,8 @@ fun LoginScreen(
                         bio = "AddaBuzz Official Streamer 🎙️",
                         followersCount = 3500,
                         followingCount = 280,
-                        diamonds = 5000,
-                        beans = 12000,
+                        coins = 5000,
+                        diamonds = 12000,
                         level = 30,
                         isVip = true
                     )
@@ -380,7 +359,7 @@ fun LoginScreen(
             text = {
                 Column {
                     Text(
-                        text = "Enter your account email to receive a password recovery link from Firebase.",
+                        text = "Enter your account email to receive a password recovery link.",
                         style = Typography.bodyMedium.copy(color = TextSecondary)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
@@ -404,7 +383,7 @@ fun LoginScreen(
                     onClick = {
                         coroutineScope.launch {
                             repository.firebaseClient.sendPasswordReset(forgotEmail)
-                            resetSuccessMessage = "Password reset email sent via Firebase for $forgotEmail"
+                            resetSuccessMessage = "Password reset email sent for $forgotEmail"
                             showForgotPasswordDialog = false
                         }
                     },
@@ -456,7 +435,7 @@ fun RegisterScreen(
                 style = Typography.headlineLarge.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
             )
             Text(
-                text = "Register with Firebase to stream and chat",
+                text = "Register to stream and chat",
                 style = Typography.bodyMedium.copy(color = TextSecondary)
             )
 
@@ -575,7 +554,7 @@ fun RegisterScreen(
                 if (isLoading) {
                     CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
                 } else {
-                    Text(text = "Create Firebase Account", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
+                    Text(text = "Create Account", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = Color.White))
                 }
             }
 

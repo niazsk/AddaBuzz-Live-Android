@@ -163,9 +163,79 @@ fun UserProfileScreen(
                 }
             }
 
-            // Wallet Quick Card
+            // Coins & Diamonds Options
             item {
                 Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Coins & Diamonds",
+                    style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                        border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(PurplePrimary, ElectricCyan))),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onNavigateWallet() }
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(text = "🪙 Coins", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "${user.coins}",
+                                style = Typography.headlineSmall.copy(color = ElectricCyan, fontWeight = FontWeight.Bold)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Use for gifts & all in-app actions",
+                                style = Typography.labelSmall.copy(color = TextSecondary)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Top Up →",
+                                style = Typography.labelMedium.copy(color = NeonPink, fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+
+                    Card(
+                        shape = RoundedCornerShape(18.dp),
+                        colors = CardDefaults.cardColors(containerColor = SurfaceCard),
+                        border = CardDefaults.outlinedCardBorder().copy(width = 1.dp, brush = Brush.horizontalGradient(listOf(GoldCoin, NeonPink))),
+                        modifier = Modifier
+                            .weight(1f)
+                            .clickable { onNavigateWallet() }
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(text = "💎 Diamonds", style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary))
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "${user.diamonds}",
+                                style = Typography.headlineSmall.copy(color = GoldCoin, fontWeight = FontWeight.Bold)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = "Withdraw only",
+                                style = Typography.labelSmall.copy(color = TextSecondary)
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "Withdraw →",
+                                style = Typography.labelMedium.copy(color = ElectricCyan, fontWeight = FontWeight.Bold)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // Wallet Quick Card
+            item {
+                Spacer(modifier = Modifier.height(12.dp))
                 Card(
                     shape = RoundedCornerShape(18.dp),
                     colors = CardDefaults.cardColors(containerColor = SurfaceCard),
@@ -181,16 +251,16 @@ fun UserProfileScreen(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(text = "💎", fontSize = 28.sp)
+                            Icon(Icons.Default.AccountBalanceWallet, contentDescription = null, tint = ElectricCyan)
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text(
-                                    text = "AddaBuzz Wallet",
+                                    text = "Open Wallet",
                                     style = Typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = TextPrimary)
                                 )
                                 Text(
-                                    text = "${user.diamonds} Diamonds  •  ${user.beans} Beans",
-                                    style = Typography.bodyMedium.copy(color = ElectricCyan)
+                                    text = "Manage Coins top-up & Diamonds withdrawal",
+                                    style = Typography.bodySmall.copy(color = TextSecondary)
                                 )
                             }
                         }

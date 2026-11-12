@@ -2,6 +2,7 @@ package com.example.data
 
 import android.content.Context
 import com.example.model.*
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.ListenerRegistration
@@ -25,7 +26,11 @@ class AddaBuzzRepository(
     val liveKitManager: LiveKitManager
 ) {
     val firebaseClient = FirebaseClient(sessionManager)
-    private val firestore = FirebaseFirestore.getInstance()
+    private val firestore: FirebaseFirestore? by lazy {
+        runCatching {
+            if (FirebaseApp.getApps(context).isEmpty()) null else FirebaseFirestore.getInstance()
+        }.getOrNull()
+    }
     private val scope = CoroutineScope(Dispatchers.Default)
     private var liveMessagesListener: ListenerRegistration? = null
 
@@ -97,8 +102,8 @@ class AddaBuzzRepository(
             bio = "Live Acoustic Songs & Chill Adda | Daily 9 PM 🎸",
             followersCount = 14200,
             followingCount = 120,
-            diamonds = 45000,
-            beans = 98000,
+            coins = 45000,
+            diamonds = 98000,
             level = 42,
             isVip = true,
             isLive = true,
@@ -113,8 +118,8 @@ class AddaBuzzRepository(
             bio = "Mobile Legends & BGMI Pro streamer | Late night tournaments 🏆",
             followersCount = 28900,
             followingCount = 310,
-            diamonds = 82000,
-            beans = 154000,
+            coins = 82000,
+            diamonds = 154000,
             level = 56,
             isVip = true,
             isLive = true,
@@ -129,8 +134,8 @@ class AddaBuzzRepository(
             bio = "8-Guest Audio Adda! Come join the mic & share funny stories!",
             followersCount = 9850,
             followingCount = 85,
-            diamonds = 18000,
-            beans = 45000,
+            coins = 18000,
+            diamonds = 45000,
             level = 31,
             isVip = true,
             isLive = true,
@@ -145,8 +150,8 @@ class AddaBuzzRepository(
             bio = "Tech talk, Flutter vs Native Android, AI coding session 💻",
             followersCount = 5600,
             followingCount = 90,
-            diamonds = 12000,
-            beans = 23000,
+            coins = 12000,
+            diamonds = 23000,
             level = 22,
             isVip = false,
             isLive = true,
@@ -242,7 +247,7 @@ class AddaBuzzRepository(
             NotificationItem(
                 id = "notif_2",
                 title = "Gift Received! 🚀",
-                description = "Sakib Hasan sent you a Space Rocket (1,000 Diamonds) in your stream!",
+                description = "Sakib Hasan sent you a Space Rocket (1,000 Coins) in your stream!",
                 timeAgo = "1h ago",
                 type = NotificationType.GIFT_RECEIVED
             ),
@@ -324,8 +329,8 @@ class AddaBuzzRepository(
         _transactions.value = listOf(
             WalletTransaction(
                 id = "tx_1",
-                title = "Diamond Recharge (+2,500 💎)",
-                amount = "+2,500 💎",
+                title = "Coin Recharge (+2,500 🪙)",
+                amount = "+2,500 🪙",
                 date = dateFormat.format(Date(System.currentTimeMillis() - 1000 * 60 * 90)),
                 isCredit = true,
                 type = "RECHARGE"
@@ -333,18 +338,18 @@ class AddaBuzzRepository(
             WalletTransaction(
                 id = "tx_2",
                 title = "Gift Sent: Space Rocket 🚀",
-                amount = "-1,000 💎",
+                amount = "-1,000 🪙",
                 date = dateFormat.format(Date(System.currentTimeMillis() - 1000 * 60 * 180)),
                 isCredit = false,
                 type = "GIFT"
             ),
             WalletTransaction(
                 id = "tx_3",
-                title = "Beans to Diamond Exchange (+1,200 💎)",
-                amount = "+1,200 💎",
+                title = "Diamonds Withdrawn (1,200 💎)",
+                amount = "-1,200 💎",
                 date = dateFormat.format(Date(System.currentTimeMillis() - 1000 * 60 * 60 * 24)),
-                isCredit = true,
-                type = "EXCHANGE"
+                isCredit = false,
+                type = "WITHDRAW"
             )
         )
     }
@@ -352,7 +357,8 @@ class AddaBuzzRepository(
     // Firebase Firestore realtime listeners for live room chat
     fun startLiveRoomMessagesListener(roomId: String) {
         stopLiveRoomMessagesListener()
-        liveMessagesListener = firestore
+        val db = firestore ?: return
+        liveMessagesListener = db
             .collection("live_rooms")
             .document(roomId)
             .collection("messages")
@@ -388,13 +394,13 @@ class AddaBuzzRepository(
         liveMessagesListener = null
     }
 
-    // Gift Catalog
+    // Gift Catalog (priced in Coins)
     val availableGifts = listOf(
         Gift(
             id = "gift_rose",
             name = "Red Rose",
             iconEmoji = "🌹",
-            diamondPrice = 10,
+            coinPrice = 10,
             animationType = "BURST",
             description = "Send a lovely rose"
         ),
@@ -402,7 +408,7 @@ class AddaBuzzRepository(
             id = "gift_heart",
             name = "Heart Balloon",
             iconEmoji = "💖",
-            diamondPrice = 50,
+            coinPrice = 50,
             animationType = "FLOAT",
             description = "Floating neon hearts"
         ),
@@ -410,7 +416,7 @@ class AddaBuzzRepository(
             id = "gift_car",
             name = "Cyber Sportscar",
             iconEmoji = "🏎️",
-            diamondPrice = 500,
+            coinPrice = 500,
             animationType = "DRIVE",
             description = "Electric neon supercar sweep"
         ),
@@ -418,7 +424,7 @@ class AddaBuzzRepository(
             id = "gift_rocket",
             name = "Space Rocket",
             iconEmoji = "🚀",
-            diamondPrice = 1000,
+            coinPrice = 1000,
             animationType = "ROCKET_LAUNCH",
             description = "Blasts off into the galaxy"
         ),
@@ -426,7 +432,7 @@ class AddaBuzzRepository(
             id = "gift_galaxy",
             name = "Super Galaxy",
             iconEmoji = "🌌",
-            diamondPrice = 5000,
+            coinPrice = 5000,
             animationType = "COSMIC_BURST",
             description = "Spectacular cosmic portal"
         ),
@@ -434,20 +440,20 @@ class AddaBuzzRepository(
             id = "gift_crown",
             name = "Golden Crown",
             iconEmoji = "👑",
-            diamondPrice = 10000,
+            coinPrice = 10000,
             animationType = "CROWN_CORONATION",
             description = "Coronate the host as royalty!"
         )
     )
 
-    // Recharge Packages
+    // Recharge Packages (buy Coins)
     val rechargePackages = listOf(
-        RechargePackage("pkg_1", diamonds = 100, bonusDiamonds = 10, priceUsd = 0.99),
-        RechargePackage("pkg_2", diamonds = 550, bonusDiamonds = 70, priceUsd = 4.99, isHot = true),
-        RechargePackage("pkg_3", diamonds = 1200, bonusDiamonds = 200, priceUsd = 9.99),
-        RechargePackage("pkg_4", diamonds = 2600, bonusDiamonds = 500, priceUsd = 19.99, isHot = true),
-        RechargePackage("pkg_5", diamonds = 7000, bonusDiamonds = 1500, priceUsd = 49.99),
-        RechargePackage("pkg_6", diamonds = 15000, bonusDiamonds = 4000, priceUsd = 99.99)
+        RechargePackage("pkg_1", coins = 100, bonusCoins = 10, priceUsd = 0.99),
+        RechargePackage("pkg_2", coins = 550, bonusCoins = 70, priceUsd = 4.99, isHot = true),
+        RechargePackage("pkg_3", coins = 1200, bonusCoins = 200, priceUsd = 9.99),
+        RechargePackage("pkg_4", coins = 2600, bonusCoins = 500, priceUsd = 19.99, isHot = true),
+        RechargePackage("pkg_5", coins = 7000, bonusCoins = 1500, priceUsd = 49.99),
+        RechargePackage("pkg_6", coins = 15000, bonusCoins = 4000, priceUsd = 99.99)
     )
 
     // Room operations
@@ -528,8 +534,8 @@ class AddaBuzzRepository(
 
         // Persist live room chat message to Firebase Firestore
         val roomId = _currentRoom.value?.id ?: "room_${System.currentTimeMillis()}"
-        firestore.collection("live_rooms").document(roomId).collection("messages")
-            .add(
+        firestore?.collection("live_rooms")?.document(roomId)?.collection("messages")
+            ?.add(
                 hashMapOf(
                     "sender_id" to user.id,
                     "sender_username" to user.username,
@@ -570,21 +576,21 @@ class AddaBuzzRepository(
 
     fun sendGift(gift: Gift): Boolean {
         val user = sessionManager.currentUser.value ?: return false
-        if (user.diamonds < gift.diamondPrice) {
+        if (user.coins < gift.coinPrice) {
             return false
         }
 
-        val newBalance = user.diamonds - gift.diamondPrice
-        sessionManager.updateDiamonds(newBalance)
+        val newCoinBalance = user.coins - gift.coinPrice
+        sessionManager.updateCoins(newCoinBalance)
 
         val giftMessage = ChatMessage(
             id = "gift_${System.currentTimeMillis()}",
             sender = user,
-            text = "Sent ${gift.name} ${gift.iconEmoji} (${gift.diamondPrice} 💎)",
+            text = "Sent ${gift.name} ${gift.iconEmoji} (${gift.coinPrice} 🪙)",
             isGift = true,
             giftName = gift.name,
             giftIcon = gift.iconEmoji,
-            giftAmount = gift.diamondPrice
+            giftAmount = gift.coinPrice
         )
 
         _liveMessages.value = _liveMessages.value + giftMessage
@@ -592,39 +598,41 @@ class AddaBuzzRepository(
 
         // Persist gift message to Firebase Firestore
         val roomId = _currentRoom.value?.id ?: "room_${System.currentTimeMillis()}"
-        firestore.collection("live_rooms").document(roomId).collection("messages")
-            .add(
+        firestore?.collection("live_rooms")?.document(roomId)?.collection("messages")
+            ?.add(
                 hashMapOf(
                     "sender_id" to user.id,
                     "sender_username" to user.username,
                     "sender_name" to user.displayName,
                     "sender_avatar" to user.avatarUrl,
                     "sender_email" to user.email,
-                    "text" to "Sent ${gift.name} ${gift.iconEmoji} (${gift.diamondPrice} 💎)",
+                    "text" to "Sent ${gift.name} ${gift.iconEmoji} (${gift.coinPrice} 🪙)",
                     "timestamp" to FieldValue.serverTimestamp(),
                     "is_gift" to true,
                     "gift_name" to gift.name,
                     "gift_icon" to gift.iconEmoji,
-                    "gift_amount" to gift.diamondPrice.toLong()
+                    "gift_amount" to gift.coinPrice.toLong()
                 )
             )
 
-        // Log transaction
+        // Log transaction (coin spend)
         val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
         val tx = WalletTransaction(
             id = "tx_${System.currentTimeMillis()}",
             title = "Sent Gift: ${gift.name} ${gift.iconEmoji}",
-            amount = "-${gift.diamondPrice} 💎",
+            amount = "-${gift.coinPrice} 🪙",
             date = dateFormat.format(Date()),
             isCredit = false,
             type = "GIFT"
         )
         _transactions.value = listOf(tx) + _transactions.value
 
-        // Increase host beans
+        // Increase host withdrawable diamonds (earnings)
         _currentRoom.value?.host?.let { host ->
-            val addedBeans = (gift.diamondPrice * 0.7).toLong()
-            sessionManager.updateBeans(user.beans + addedBeans)
+            val earnedDiamonds = (gift.coinPrice * 0.7).toLong()
+            if (host.id == user.id) {
+                sessionManager.updateDiamonds(user.diamonds + earnedDiamonds)
+            }
         }
 
         return true
@@ -698,18 +706,18 @@ class AddaBuzzRepository(
         }
     }
 
-    // Wallet Recharge & Exchange
-    fun rechargeDiamonds(pkg: RechargePackage): Boolean {
+    // Wallet Recharge & Withdraw
+    fun rechargeCoins(pkg: RechargePackage): Boolean {
         val user = sessionManager.currentUser.value ?: return false
-        val totalDiamonds = pkg.diamonds + pkg.bonusDiamonds
-        val newBalance = user.diamonds + totalDiamonds
-        sessionManager.updateDiamonds(newBalance)
+        val totalCoins = pkg.coins + pkg.bonusCoins
+        val newBalance = user.coins + totalCoins
+        sessionManager.updateCoins(newBalance)
 
         val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
         val tx = WalletTransaction(
             id = "tx_${System.currentTimeMillis()}",
-            title = "Recharge +$totalDiamonds 💎 ($${pkg.priceUsd})",
-            amount = "+$totalDiamonds 💎",
+            title = "Coin Recharge +$totalCoins 🪙 ($${pkg.priceUsd})",
+            amount = "+$totalCoins 🪙",
             date = dateFormat.format(Date()),
             isCredit = true,
             type = "RECHARGE"
@@ -718,22 +726,20 @@ class AddaBuzzRepository(
         return true
     }
 
-    fun exchangeBeansToDiamonds(beansToExchange: Long): Boolean {
+    fun withdrawDiamonds(amount: Long): Boolean {
         val user = sessionManager.currentUser.value ?: return false
-        if (user.beans < beansToExchange || beansToExchange <= 0) return false
+        if (user.diamonds < amount || amount <= 0) return false
 
-        val diamondsGain = (beansToExchange * 0.5).toLong()
-        sessionManager.updateBeans(user.beans - beansToExchange)
-        sessionManager.updateDiamonds(user.diamonds + diamondsGain)
+        sessionManager.updateDiamonds(user.diamonds - amount)
 
         val dateFormat = SimpleDateFormat("dd MMM, hh:mm a", Locale.getDefault())
         val tx = WalletTransaction(
             id = "tx_${System.currentTimeMillis()}",
-            title = "Converted $beansToExchange Beans to $diamondsGain 💎",
-            amount = "+$diamondsGain 💎",
+            title = "Diamonds Withdrawn",
+            amount = "-$amount 💎",
             date = dateFormat.format(Date()),
-            isCredit = true,
-            type = "EXCHANGE"
+            isCredit = false,
+            type = "WITHDRAW"
         )
         _transactions.value = listOf(tx) + _transactions.value
         return true
@@ -774,8 +780,8 @@ class AddaBuzzRepository(
         }
 
         // Persist direct message to Firebase Firestore
-        firestore.collection("conversations").document(conversationId).collection("messages")
-            .add(
+        firestore?.collection("conversations")?.document(conversationId)?.collection("messages")
+            ?.add(
                 hashMapOf(
                     "sender_id" to "me",
                     "text" to text,

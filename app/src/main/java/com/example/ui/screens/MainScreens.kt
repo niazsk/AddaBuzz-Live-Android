@@ -67,7 +67,7 @@ fun HomeScreen(
     Scaffold(
         topBar = {
             AddaBuzzTopBar(
-                diamonds = currentUser?.diamonds ?: 0L,
+                coins = currentUser?.coins ?: 0L,
                 unreadNotifications = unreadNotifs,
                 onWalletClick = onWalletClick,
                 onNotificationsClick = onNotificationsClick,

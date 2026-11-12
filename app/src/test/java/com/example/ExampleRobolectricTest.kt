@@ -45,12 +45,12 @@ class ExampleRobolectricTest {
         val liveKitManager = LiveKitManager(context)
         val repository = AddaBuzzRepository(context, sessionManager, liveKitManager)
 
-        val initialDiamonds = sessionManager.currentUser.value?.diamonds ?: 0L
+        val initialCoins = sessionManager.currentUser.value?.coins ?: 0L
         val roseGift = repository.availableGifts.first { it.id == "gift_rose" }
         val sent = repository.sendGift(roseGift)
 
         assertTrue(sent)
-        val updatedDiamonds = sessionManager.currentUser.value?.diamonds ?: 0L
-        assertEquals(initialDiamonds - roseGift.diamondPrice, updatedDiamonds)
+        val updatedCoins = sessionManager.currentUser.value?.coins ?: 0L
+        assertEquals(initialCoins - roseGift.coinPrice, updatedCoins)
     }
 }

@@ -48,8 +48,8 @@ class SessionManager(context: Context) {
                 bio = "AddaBuzz Official Streamer 🎙️ | Chit-Chat & Music lover",
                 followersCount = 1420,
                 followingCount = 380,
-                diamonds = 2500,
-                beans = 7200,
+                coins = 2500,
+                diamonds = 7200,
                 level = 24,
                 isVip = true,
                 badge = "VIP Host"
@@ -65,8 +65,8 @@ class SessionManager(context: Context) {
                 bio = "Connecting & Streaming on AddaBuzz Live 🚀",
                 followersCount = 2150,
                 followingCount = 412,
-                diamonds = 3500,
-                beans = 8900,
+                coins = 3500,
+                diamonds = 8900,
                 level = 28,
                 isVip = true,
                 badge = "Elite Host"
@@ -99,12 +99,12 @@ class SessionManager(context: Context) {
         _currentUser.value = null
     }
 
-    fun updateDiamonds(newBalance: Long) {
-        _currentUser.value = _currentUser.value?.copy(diamonds = newBalance)
+    fun updateCoins(newBalance: Long) {
+        _currentUser.value = _currentUser.value?.copy(coins = newBalance)
     }
 
-    fun updateBeans(newBalance: Long) {
-        _currentUser.value = _currentUser.value?.copy(beans = newBalance)
+    fun updateDiamonds(newBalance: Long) {
+        _currentUser.value = _currentUser.value?.copy(diamonds = newBalance)
     }
 
     fun getServerUrl(): String {

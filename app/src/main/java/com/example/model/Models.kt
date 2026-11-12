@@ -9,8 +9,8 @@ data class User(
     val bio: String = "",
     val followersCount: Int = 0,
     val followingCount: Int = 0,
-    val diamonds: Long = 1250,
-    val beans: Long = 4800,
+    val coins: Long = 1250,
+    val diamonds: Long = 4800,
     val level: Int = 18,
     val isVip: Boolean = true,
     val isLive: Boolean = false,
@@ -61,7 +61,7 @@ data class Gift(
     val id: String,
     val name: String,
     val iconEmoji: String,
-    val diamondPrice: Int,
+    val coinPrice: Int,
     val animationType: String,
     val description: String
 )
@@ -77,8 +77,8 @@ data class WalletTransaction(
 
 data class RechargePackage(
     val id: String,
-    val diamonds: Int,
-    val bonusDiamonds: Int,
+    val coins: Int,
+    val bonusCoins: Int,
     val priceUsd: Double,
     val isHot: Boolean = false
 )
